@@ -1,0 +1,5 @@
+---
+bool connected
+bool armed
+string mode
+bool landed

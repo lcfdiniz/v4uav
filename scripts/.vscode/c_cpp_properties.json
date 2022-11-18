@@ -1,0 +1,25 @@
+{
+    "configurations": [
+        {
+            "browse": {
+                "databaseFilename": "",
+                "limitSymbolsToIncludedHeaders": true
+            },
+            "includePath": [
+                "/home/lucas/catkin_ws/devel/include",
+                "/opt/ros/melodic/include",
+                "/home/lucas/catkin_ws/src/mavros/libmavconn/include",
+                "/home/lucas/catkin_ws/src/mavros/mavros/include",
+                "/home/lucas/catkin_ws/src/mavros/mavros_msgs/include",
+                "/home/lucas/catkin_ws/src/mavros/test_mavros/include",
+                "/usr/include"
+            ],
+            "name": "Linux",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerPath": "/opt/gcc-arm-none-eabi-9-2020-q2-update/bin/arm-none-eabi-gcc",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++14"
+        }
+    ],
+    "version": 4
+}
