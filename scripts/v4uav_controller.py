@@ -30,8 +30,9 @@ def shutdown_msg():
     rospy.loginfo(msg)
 
 def handle_command(data):
+    global reached
     success = False # Flag to acknowledge if mode transition was successful
-    if uav_st.landed:
+    if uav_st.landed == 1: # LANDED_STATE_ON_GROUND
         if data.mode == 'TAKEOFF':
             rate = rospy.Rate(20)
             while not uav_st.armed:
@@ -40,18 +41,36 @@ def handle_command(data):
             uav_sp.z_sp = data.input_1
             msg = 'Take off to ' + str(uav_sp.z_sp) + ' meters.'
             rospy.loginfo(msg)
+            reached = False
             success = True
         else:
             msg = 'Please TAKEOFF before sending any other command.'
             rospy.logwarn(msg)
-    else:
+    elif uav_st.landed == 2: # LANDED_STATE_IN_AIR
         if data.mode == 'SET_POS':
-            pass
+            uav_sp.x_sp = data.input_1
+            uav_sp.y_sp = data.input_2
+            uav_sp.z_sp = data.input_3
+            uav_sp.yaw_sp = data.input_4
+            msg = 'Setting position to (' + str(uav_sp.x_sp) + ' x, ' + str(uav_sp.y_sp) + ' y, ' + str(uav_sp.z_sp) + ' z, ' + str(uav_sp.yaw_sp) + ' yaw' + ').'
+            rospy.loginfo(msg)
+            reached = False
+            success = True
         elif data.mode == 'SET_REL_POS':
-            pass
+            uav_sp.x_sp = round(uav_pos.x,2) + data.input_1
+            uav_sp.y_sp = round(uav_pos.y,2) + data.input_2
+            uav_sp.z_sp = round(uav_pos.z,2) + data.input_3
+            uav_sp.yaw_sp = round(uav_pos.yaw,2) + data.input_4
+            msg = 'Setting position to (' + str(uav_sp.x_sp) + ' x, ' + str(uav_sp.y_sp) + ' y, ' + str(uav_sp.z_sp) + ' z, ' + str(uav_sp.yaw_sp) + ' yaw' + ').'
+            rospy.loginfo(msg)
+            reached = False
+            success = True
         elif data.mode == 'GET_POS':
-            pass
+            msg = 'Current position (' + str(uav_sp.x_sp) + ' x, ' + str(uav_sp.y_sp) + ' y, ' + str(uav_sp.z_sp) + ' z, ' + str(uav_sp.yaw_sp) + ' yaw' + ').'
+            rospy.loginfo(msg)
+            success = True
         elif data.mode == 'HOLD':
+            # Nothing to do, just keep the current setpoints
             pass
         elif data.mode == 'TRACKING':
             pass
@@ -65,7 +84,7 @@ def handle_command(data):
     if success:
         uav_sp.mode = data.mode
         msg = uav_sp.mode + ' mode enabled.'
-        rospy.loginfo(msg)
+        #rospy.loginfo(msg)
 
 def input_callback(data):
     data.mode = data.mode.upper()
@@ -121,10 +140,11 @@ def set_autopilot_mode(mode):
                 get_state_client() # Update the vehicle's state
                 flightModeService(custom_mode = mode)
                 rate.sleep()
-            print('Switched to OFFBOARD')
+            msg = "Switched to autopilot's OFFBOARD mode"
+            rospy.loginfo(msg)
         except rospy.ServiceException as e:
             msg = 'Service set_mode call failed: ' + str(e)
-            rospy.loginfo(msg)
+            rospy.logwarn(msg)
 
 def init():
     msg = 'Initializing the program.'
@@ -135,10 +155,11 @@ def init():
     global v4uav_pub
     v4uav_pub = rospy.Publisher("/mavros/setpoint_raw/local", PositionTarget, queue_size=10)
     # Step 3: Declare global variables
-    global uav_pos, uav_st, uav_sp
+    global uav_pos, uav_st, uav_sp, reached
     uav_pos = uavPosition() # Global object to store the vehicle's position
     uav_st = uavState() # Global object to store the vehicle's state
     uav_sp = uavSetpoint() # Global object to store the vehicle's setpoint
+    reached = True # Global variable to indicate if the vehicle have reached its goal
     # Step 4: Set OFFBOARD mode
     publish_sp(100) # Publish some setpoints before switching to OFFBOARD
     set_autopilot_mode('OFFBOARD')
@@ -166,6 +187,25 @@ def get_state_client():
         msg = 'Service call failed: ' + str(e)
         rospy.loginfo(msg)
 
+def per_delta(target, actual):
+    if max(target, actual) == 0.0:
+        return 0.0
+    else:
+        return abs(target-actual)/max(target, actual) # Is there a better way?
+
+def check_goal():
+    dx = per_delta(uav_sp.x_sp, uav_pos.x)
+    dy = per_delta(uav_sp.y_sp, uav_pos.y)
+    dz = per_delta(uav_sp.z_sp, uav_pos.z)
+    dyaw = per_delta(uav_sp.yaw_sp, uav_pos.yaw)
+    if max(dx, dy, dz, dyaw) < 0.1:
+        msg = uav_sp.mode + ' completed.'
+        rospy.loginfo(msg)
+        uav_sp.mode = 'HOLD'
+        return True
+    else:
+        return False
+
 def update_states():
     msg = 'Updating the vehicle states.'
     #rospy.loginfo(msg)
@@ -173,6 +213,10 @@ def update_states():
     get_position_client()
     # Step 2: Get the vehicle's states
     get_state_client()
+    # Step 3: Check if the vehicle have reached its goal (TAKEOFF, SET_POS and SET_REL_POS modes)
+    global reached
+    if (uav_sp.mode in ['TAKEOFF', 'SET_POS', 'SET_REL_POS']) and (not reached):
+        reached = check_goal()
 
 def update_setpoint():
     msg = 'Updating the vehicle setpoints'
@@ -190,7 +234,7 @@ def send_commands():
 def controller():
     rospy.init_node('v4uav_controller') # Initialize the ROS node for the process
     init() # Initialize the program
-    rate = rospy.Rate(20) # 1 Hz loops
+    rate = rospy.Rate(30) # 30 Hz loops
     while not rospy.is_shutdown(): # Main control structure
         # Step 1: Update the vehicle's state
         update_states()

@@ -20,20 +20,21 @@ class uavPosition:
         quat = [q.x,q.y,q.z,q.w]
         self.yaw = euler_from_quaternion(quat)[2]
 
-    def get_position(self, req):
-        return GetPositionResponse(self.x, self.y, self.z, self.yaw)
-
     def set_position(self, data):
         self.x = data.x
         self.y = data.y
         self.z = data.z
         self.yaw = data.yaw
+
+def get_position(req):
+    return GetPositionResponse(pos.x, pos.y, pos.z, pos.yaw)
     
 def position():
     rospy.init_node('v4uav_position')
+    global pos
     pos = uavPosition()
     rospy.Subscriber("/mavros/local_position/pose", PoseStamped, pos.update_position)
-    rospy.Service('get_position', GetPosition, pos.get_position)
+    rospy.Service('get_position', GetPosition, get_position)
     msg = 'Ready to give positions.'
     rospy.loginfo(msg)
     rospy.spin() # spin() simply keeps python from exiting until this node is stopped

@@ -2,4 +2,4 @@
 bool connected
 bool armed
 string mode
-bool landed
+uint8 landed
