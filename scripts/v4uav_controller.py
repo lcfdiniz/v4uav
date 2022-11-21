@@ -20,10 +20,10 @@ class uavSetpoint():
     
     def update_setpoint(self, data):
         self.mode = data.mode
-        self.x_sp = data.x
-        self.y_sp = data.y
-        self.z_sp = data.z
-        self.yaw_sp = data.yaw
+        self.x_sp = data.input_1
+        self.y_sp = data.input_2
+        self.z_sp = data.input_3
+        self.yaw_sp = data.input_4
 
 def shutdown_msg():
     msg = 'V4UAV was shutdown.'
@@ -31,7 +31,7 @@ def shutdown_msg():
 
 def handle_command(data):
     global reached
-    success = False # Flag to acknowledge if mode transition was successful
+    success = True # Flag to acknowledge if mode transition was successful
     if uav_st.landed == 1: # LANDED_STATE_ON_GROUND
         if data.mode == 'TAKEOFF':
             rate = rospy.Rate(20)
@@ -42,10 +42,10 @@ def handle_command(data):
             msg = 'Take off to ' + str(uav_sp.z_sp) + ' meters.'
             rospy.loginfo(msg)
             reached = False
-            success = True
         else:
             msg = 'Please TAKEOFF before sending any other command.'
             rospy.logwarn(msg)
+            success = False
     elif uav_st.landed == 2: # LANDED_STATE_IN_AIR
         if data.mode == 'SET_POS':
             uav_sp.x_sp = data.input_1
@@ -55,7 +55,6 @@ def handle_command(data):
             msg = 'Setting position to (' + str(uav_sp.x_sp) + ' x, ' + str(uav_sp.y_sp) + ' y, ' + str(uav_sp.z_sp) + ' z, ' + str(uav_sp.yaw_sp) + ' yaw' + ').'
             rospy.loginfo(msg)
             reached = False
-            success = True
         elif data.mode == 'SET_REL_POS':
             uav_sp.x_sp = round(uav_pos.x,2) + data.input_1
             uav_sp.y_sp = round(uav_pos.y,2) + data.input_2
@@ -64,23 +63,24 @@ def handle_command(data):
             msg = 'Setting position to (' + str(uav_sp.x_sp) + ' x, ' + str(uav_sp.y_sp) + ' y, ' + str(uav_sp.z_sp) + ' z, ' + str(uav_sp.yaw_sp) + ' yaw' + ').'
             rospy.loginfo(msg)
             reached = False
-            success = True
         elif data.mode == 'GET_POS':
             msg = 'Current position (' + str(uav_sp.x_sp) + ' x, ' + str(uav_sp.y_sp) + ' y, ' + str(uav_sp.z_sp) + ' z, ' + str(uav_sp.yaw_sp) + ' yaw' + ').'
             rospy.loginfo(msg)
-            success = True
         elif data.mode == 'HOLD':
             # Nothing to do, just keep the current setpoints
             pass
         elif data.mode == 'TRACKING':
+            # Nothing to do here, the setpoint will be updated with update_setpoint()
             pass
         elif data.mode == 'LANDING':
+            # Nothing to do here, the setpoint will be updated with update_setpoint()
             pass
         elif data.mode == 'RTL':
-            pass
+            set_autopilot_mode('AUTO.RTL')
         elif data.mode == 'TAKEOFF':
             msg = 'You already took off.'
             rospy.logwarn(msg)
+            success = False
     if success:
         uav_sp.mode = data.mode
         msg = uav_sp.mode + ' mode enabled.'
@@ -103,23 +103,16 @@ def input_callback(data):
         msg = 'Unrecognized mode. Allowed modes: TAKEOFF, SET_POS, SET_REL_POS, GET_POS, HOLD, TRACKING, LANDING, and RTL.'
         rospy.logwarn(msg)
 
-def publish_sp(n=1):
-    msg = PositionTarget(
-        header=Header(
-            # We need to add seq here?
-            stamp=rospy.Time.now(),
-            frame_id="world"), 
-        coordinate_frame=1)
-    # Fulfilling PositionTarget message
-    msg.position.x = uav_sp.x_sp
-    msg.position.y = uav_sp.y_sp
-    msg.position.z = uav_sp.z_sp
-    msg.yaw = uav_sp.yaw_sp
+def publish_sp():
+    msg = V4UAVMsg()
+    msg.mode = uav_sp.mode
+    msg.input_1 = uav_sp.x_sp
+    msg.input_2 = uav_sp.y_sp
+    msg.input_3 = uav_sp.z_sp
+    msg.input_4 = uav_sp.yaw_sp
     rate = rospy.Rate(20)
-    # Publish n messages
-    for i in range(0,n):
-        v4uav_pub.publish(msg)
-        rate.sleep()
+    v4uav_pub.publish(msg)
+    rate.sleep()
 
 def set_arm():
     rospy.wait_for_service('mavros/cmd/arming')
@@ -140,7 +133,7 @@ def set_autopilot_mode(mode):
                 get_state_client() # Update the vehicle's state
                 flightModeService(custom_mode = mode)
                 rate.sleep()
-            msg = "Switched to autopilot's OFFBOARD mode"
+            msg = "Switched to autopilot's " + mode + "mode"
             rospy.loginfo(msg)
         except rospy.ServiceException as e:
             msg = 'Service set_mode call failed: ' + str(e)
@@ -153,7 +146,8 @@ def init():
     v4uav_sub = rospy.Subscriber("/v4uav/commands", V4UAVMsg, input_callback)
     # Step 2: Publish to a MAVROS topic
     global v4uav_pub
-    v4uav_pub = rospy.Publisher("/mavros/setpoint_raw/local", PositionTarget, queue_size=10)
+    #v4uav_pub = rospy.Publisher("/mavros/setpoint_raw/local", PositionTarget, queue_size=10)
+    v4uav_pub = rospy.Publisher("/v4uav/setpoint", V4UAVMsg, queue_size=10)
     # Step 3: Declare global variables
     global uav_pos, uav_st, uav_sp, reached
     uav_pos = uavPosition() # Global object to store the vehicle's position
@@ -161,7 +155,6 @@ def init():
     uav_sp = uavSetpoint() # Global object to store the vehicle's setpoint
     reached = True # Global variable to indicate if the vehicle have reached its goal
     # Step 4: Set OFFBOARD mode
-    publish_sp(100) # Publish some setpoints before switching to OFFBOARD
     set_autopilot_mode('OFFBOARD')
     # If successful, we are ready to takeoff
     msg = 'Ready to takeoff.'
@@ -221,10 +214,7 @@ def update_states():
 def update_setpoint():
     msg = 'Updating the vehicle setpoints'
     #rospy.loginfo(msg)
-
-def run_controllers():
-    msg = 'Running the controllers'
-    #rospy.loginfo(msg)
+    # Step 1: Call detection service
 
 def send_commands():
     msg = 'Sending MAVROS commands.'
@@ -241,9 +231,7 @@ def controller():
         # Step 2: Update the vehicle's setpoint when in inspection modes
         if uav_sp.mode in ['TRACKING', 'LANDING']:
             update_setpoint()
-        # Step 3: Run the controllers 
-        run_controllers()
-        # Step 4: Send MAVROS commands
+        # Step 3: Send MAVROS commands
         send_commands()
         rate.sleep()
     rospy.on_shutdown(shutdown_msg)
