@@ -1,0 +1,7 @@
+string mode
+---
+uint8 n_obj
+float64 dx
+float64 dy
+float64 dz
+float64 dyaw

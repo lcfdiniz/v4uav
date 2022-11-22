@@ -1,6 +1,0 @@
-uint8 mode
----
-uint8 ld
-float32[] th
-float32[] rh
-float32[] dy

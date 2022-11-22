@@ -2,13 +2,12 @@
 import rospy
 from std_msgs.msg import Header
 from mavros_msgs.msg import PositionTarget
-from mavros_msgs.srv import SetMode
-from mavros_msgs.srv import CommandBool
+from mavros_msgs.srv import SetMode, CommandBool
 from v4uav.msg import V4UAV as V4UAVMsg
-from v4uav.srv import GetPosition
-from v4uav.srv import GetState
+from v4uav.srv import GetPosition, GetState, GetDetection
 from v4uav_position import uavPosition
 from v4uav_state import uavState
+from v4uav_detector import uavDetection
 
 class uavSetpoint():
     def __init__(self):
@@ -133,7 +132,7 @@ def set_autopilot_mode(mode):
                 get_state_client() # Update the vehicle's state
                 flightModeService(custom_mode = mode)
                 rate.sleep()
-            msg = "Switched to autopilot's " + mode + "mode"
+            msg = "Switched to autopilot's " + mode + " mode"
             rospy.loginfo(msg)
         except rospy.ServiceException as e:
             msg = 'Service set_mode call failed: ' + str(e)
@@ -149,10 +148,11 @@ def init():
     #v4uav_pub = rospy.Publisher("/mavros/setpoint_raw/local", PositionTarget, queue_size=10)
     v4uav_pub = rospy.Publisher("/v4uav/setpoint", V4UAVMsg, queue_size=10)
     # Step 3: Declare global variables
-    global uav_pos, uav_st, uav_sp, reached
+    global uav_pos, uav_st, uav_sp, uav_det, reached
     uav_pos = uavPosition() # Global object to store the vehicle's position
     uav_st = uavState() # Global object to store the vehicle's state
     uav_sp = uavSetpoint() # Global object to store the vehicle's setpoint
+    uav_det = uavDetection() # Global object to store the detections
     reached = True # Global variable to indicate if the vehicle have reached its goal
     # Step 4: Set OFFBOARD mode
     set_autopilot_mode('OFFBOARD')
@@ -176,6 +176,16 @@ def get_state_client():
         get_state = rospy.ServiceProxy('get_state', GetState)
         st = get_state()
         uav_st.set_state(st)
+    except (rospy.ROSException, rospy.ServiceException) as e:
+        msg = 'Service call failed: ' + str(e)
+        rospy.loginfo(msg)
+
+def get_detection_client():
+    try:
+        rospy.wait_for_service('get_detection', timeout=5)
+        get_detection = rospy.ServiceProxy('get_detection', GetDetection)
+        det = get_detection(mode=uav_sp.mode)
+        uav_det.set_detection(uav_sp.mode, det)
     except (rospy.ROSException, rospy.ServiceException) as e:
         msg = 'Service call failed: ' + str(e)
         rospy.loginfo(msg)
@@ -215,6 +225,7 @@ def update_setpoint():
     msg = 'Updating the vehicle setpoints'
     #rospy.loginfo(msg)
     # Step 1: Call detection service
+    get_detection_client()
 
 def send_commands():
     msg = 'Sending MAVROS commands.'

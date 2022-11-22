@@ -67,7 +67,7 @@ add_message_files(
 # )
 add_service_files(
   FILES
-  Detection.srv
+  GetDetection.srv
   GetPosition.srv
   GetState.srv
 )
@@ -180,7 +180,7 @@ include_directories(
 #   scripts/my_python_script
 #   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 # )
-catkin_install_python(PROGRAMS scripts/detection_server.py scripts/detection_client.py scripts/v4uav_controller.py scripts/v4uav_position.py scripts/v4uav_state.py scripts/v4uav_publisher.py
+catkin_install_python(PROGRAMS scripts/detection_server.py scripts/detection_client.py scripts/v4uav_controller.py scripts/v4uav_position.py scripts/v4uav_state.py scripts/v4uav_publisher.py scripts/v4uav_detector.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
