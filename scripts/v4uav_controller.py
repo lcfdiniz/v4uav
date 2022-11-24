@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 import rospy
-from std_msgs.msg import Header
-from mavros_msgs.msg import PositionTarget
 from mavros_msgs.srv import SetMode, CommandBool
 from v4uav.msg import V4UAV as V4UAVMsg
 from v4uav.srv import GetPosition, GetState, GetDetection
 from v4uav_position import uavPosition
 from v4uav_state import uavState
 from v4uav_detector import uavDetection
+import time
 
 class uavSetpoint():
     def __init__(self):
@@ -186,6 +185,7 @@ def get_detection_client():
         get_detection = rospy.ServiceProxy('get_detection', GetDetection)
         det = get_detection(mode=uav_sp.mode)
         uav_det.set_detection(uav_sp.mode, det)
+        print(vars(uav_det))
     except (rospy.ROSException, rospy.ServiceException) as e:
         msg = 'Service call failed: ' + str(e)
         rospy.loginfo(msg)
