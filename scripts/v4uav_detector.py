@@ -91,6 +91,44 @@ def get_dyaw(box):
     
     return mean_dyaw
 
+def get_dz(box):
+    x, y, w, h = box
+    # Step 1: Some detections might be outside the image bounds (Why this happens?)
+    x = max(x, 0)
+    w = max(w, w-x)
+    y = max(y, 0)
+    h = max(h, h-y)
+    # Step 2: Calculate dz
+    dz = ptl_width*focal_length/w
+
+    return dz
+
+def get_dy(box):
+    x, y, w, h = box
+    # Step 1: Some detections might be outside the image bounds (Why this happens?)
+    x = max(x, 0)
+    w = max(w, w-x)
+    y = max(y, 0)
+    h = max(h, h-y)
+    # Step 2: Retrieve image's width
+    width = det.detImg.shape[1]
+    # Step 3: Calculate dy
+    dy = (width/2-(x+w/2))*det.dz/focal_length
+
+    return dy
+
+def get_dx(box):
+    x, y, w, h = box
+    # Step 1: Some detections might be outside the image bounds (Why this happens?)
+    x = max(x, 0)
+    w = max(w, w-x)
+    y = max(y, 0)
+    h = max(h, h-y)
+    # Step 2: Calculate dx
+    dx = (h)*det.dz/focal_length # Move h pixels forward each iteration
+
+    return dx
+
 def handle_tracking():
     # Step 1: Get output layers
     layer_names = net.getLayerNames()
@@ -121,11 +159,17 @@ def handle_tracking():
                     top_det = i
         # Step 7: Defining dyaw
         dyaw = get_dyaw(boxes[top_det])
-        beta = 0.75
         det.dyaw = dyaw*(beta) + det.dyaw*(1-beta) # Using exponentially weighted averages
-        # Step 8: Defining dz
-        # Step 9: Defining dy
-        # Step 10: Defining dx
+        if abs(det.dyaw) < 5.0: # We must correct yaw first before moving to x, y and z
+            # Step 8: Defining dz
+            dz = get_dz(boxes[top_det])
+            det.dz = dz*(beta) + det.dz*(1-beta)
+            # Step 9: Defining dy
+            dy = get_dy(boxes[top_det])
+            det.dy = dy*(beta) + det.dy*(1-beta)
+            # Step 10: Defining dx
+            dx = get_dx(boxes[top_det])
+            det.dx = dx*(beta) + det.dx*(1-beta)
     msg = str(det.n_obj) + ' object(s) detected.'
     rospy.loginfo(msg)
 
@@ -144,14 +188,18 @@ def init():
     camera_topic = "/iris_fpv_cam/usb_cam/image_raw" # If one changes the vehicle, must also change this line
     rospy.Subscriber(camera_topic, Image, camera_callback, queue_size=1, buff_size=2**24)
     # Step 2: Declare the global variables
-    global v4uav_pub, bridge, det, net
+    global v4uav_pub, bridge, det, net, beta, focal_length, ptl_width
     # Step 3: Publish images with bounding boxes to /v4uav/detection
     v4uav_pub = rospy.Publisher("/v4uav/detection", Image, queue_size=1) # This makes the process slow?
     # Step 4: Initialize CvBridge object (converts ROS images into OpenCV images)
     bridge = CvBridge()
     # Step 5: Initialize a detection object
     det = uavDetection()
-    # Step 6: Loading the model
+    # Step 6: Define global variables
+    beta = 0.75 # Beta parameter of exponentially weighted averages
+    focal_length = 277.19 # Camera's focal length
+    ptl_width = 11.7 # Distance between the farthest lines, in meters
+    # Step 7: Loading the model
     weights_path = '/home/lucas/Documents/GRIn/PTLIR/YOLO/yolov3_training_final.weights' # .weights file path
     config_path = '/home/lucas/Documents/GRIn/PTLIR/YOLO/yolov3_testing.cfg' # .cfg file path
     net = cv2.dnn.readNet(weights_path, config_path)
