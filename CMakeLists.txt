@@ -56,7 +56,8 @@ find_package(OpenCV)
 # )
 add_message_files(
   FILES
-  V4UAV.msg
+  v4uav_command.msg
+  v4uav_setpoint.msg
 )
 
 ## Generate services in the 'srv' folder

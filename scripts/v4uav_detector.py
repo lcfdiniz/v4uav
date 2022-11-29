@@ -5,7 +5,6 @@ import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from v4uav.srv import GetDetection, GetDetectionResponse
-import time
 
 class uavDetection():
     def __init__(self):
@@ -68,7 +67,7 @@ def get_dyaw(box):
     mean_dyaw = 0.0
     dyaws = []
     # Step 5: Selecting valid lines and removing outliers
-    if len(lines) > 0:
+    if lines is not None:
         for line in lines:
             x1, y1, x2, y2 = line[0]
             dx = abs(x2 - x1)
@@ -77,8 +76,11 @@ def get_dyaw(box):
             if max(dx, dy) > 0.6*max(h, w): # It was min, I've changed to max (last one)
                 signal = sum(n < 0 for n in [x2-x1, y2-y1])
                 signal = 1 if signal == 0 else -1
-                dyaw = signal*np.arctan(float(dx)/float(dy))
-                dyaws.append(dyaw)
+                if dy == 0: # dyaw is equal to +-90 degrees
+                    dyaws.append(signal*1.5708)
+                else:
+                    dyaw = signal*np.arctan(float(dx)/float(dy))
+                    dyaws.append(dyaw)
         if len(dyaws) > 0: # Ensuring we have valid lines
             # Step 5.2: Removing outliers with Tuckey's method 
             Q1 = np.percentile(dyaws, 25)
@@ -87,9 +89,23 @@ def get_dyaw(box):
             for i, dyaw in enumerate(dyaws):
                 if (dyaw > Q3 + 1.5*IQR) or (dyaw < Q1 - 1.5*IQR):
                     dyaws.pop(i)
-            mean_dyaw = round(np.rad2deg(np.mean(dyaws)), 2)
+            mean_dyaw = round(np.mean(dyaws), 2)
+        # Step 6: Handling extreme values
+        # In our algorithm, the difference between -90 and 90 degrees is subtle
+        # When dyaw is higher than 75 degrees (not expected in real conditions)
+        # we will base dyaw direction in detection's location
+        if abs(mean_dyaw) > 1.309: # 75 degrees
+            if (x+w/2) > det.detImg.shape[1]/2:
+                mean_dyaw = -abs(mean_dyaw)
+            else:
+                mean_dyaw = abs(mean_dyaw)
+        success = True
+    else:
+        msg = 'Unable to find lines'
+        rospy.logwarn(msg)
+        success = False
     
-    return mean_dyaw
+    return success, mean_dyaw
 
 def get_dz(box):
     x, y, w, h = box
@@ -150,26 +166,38 @@ def handle_tracking():
     det.n_obj = len(indexes)
     if det.n_obj > 0: #  Check if an object was detected
         # Step 6: Prioritize the detection on top (since we are moving forward)
-        max_y = 0
+        min_y = det.detImg.shape[0]
         top_det = indexes[0] # index 0
         for i in range(len(boxes)):
             if i in indexes:
-                y1 = boxes[i][1] + boxes[i][3] # y1 = y0 + height
-                if y1 > max_y:
+                y0 = boxes[i][1]
+                #y1 = boxes[i][1] + boxes[i][3] # y1 = y0 + height
+                if y0 <= min_y:
+                    min_y = y0
                     top_det = i
         # Step 7: Defining dyaw
-        dyaw = get_dyaw(boxes[top_det])
-        det.dyaw = dyaw*(beta) + det.dyaw*(1-beta) # Using exponentially weighted averages
-        if abs(det.dyaw) < 5.0: # We must correct yaw first before moving to x, y and z
-            # Step 8: Defining dz
-            dz = get_dz(boxes[top_det])
-            det.dz = dz*(beta) + det.dz*(1-beta)
-            # Step 9: Defining dy
-            dy = get_dy(boxes[top_det])
-            det.dy = dy*(beta) + det.dy*(1-beta)
-            # Step 10: Defining dx
-            dx = get_dx(boxes[top_det])
-            det.dx = dx*(beta) + det.dx*(1-beta)
+        success, dyaw = get_dyaw(boxes[top_det])
+        if success: # Certify that we were able to find lines
+            det.dyaw = dyaw*(beta) + det.dyaw*(1-beta) # Using exponentially weighted averages
+            if abs(det.dyaw) < 5.0: # We must correct yaw first before moving to x, y and z
+                # Step 8: Defining dz
+                dz = get_dz(boxes[top_det])
+                det.dz = dz*(beta) + det.dz*(1-beta)
+                # Step 9: Defining dy
+                dy = get_dy(boxes[top_det])
+                det.dy = dy*(beta) + det.dy*(1-beta)
+                # Step 10: Defining dx
+                dx = get_dx(boxes[top_det])
+                det.dx = dx*(beta) + det.dx*(1-beta)
+            else: # dyaw is higher than 5 degrees
+                det.dz = 0.0
+                det.dy = 0.0
+                det.dx = 0.0
+        else: # we couldn't find lines
+            det.dyaw = 0.0
+            det.dz= 0.0
+            det.dy = 0.0
+            det.dx = 0.0
     msg = str(det.n_obj) + ' object(s) detected.'
     rospy.loginfo(msg)
 
