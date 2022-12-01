@@ -190,19 +190,24 @@ def handle_tracking():
                 dx = get_dx(boxes[top_det])
                 det.dx = dx*(beta) + det.dx*(1-beta)
             else: # dyaw is higher than 5 degrees
-                det.dz = 0.0
-                det.dy = 0.0
-                det.dx = 0.0
+                det.dz = 0.0 + det.dz*(1-beta)
+                det.dy = 0.0 + det.dy*(1-beta)
+                det.dx = 0.0 + det.dx*(1-beta)
         else: # we couldn't find lines
-            det.dyaw = 0.0
-            det.dz= 0.0
-            det.dy = 0.0
-            det.dx = 0.0
+            det.dyaw = 0.0 + det.dyaw*(1-beta)
+            det.dz= 0.0 + det.dz*(1-beta)
+            det.dy = 0.0 + det.dy*(1-beta)
+            det.dx = 0.0 + det.dx*(1-beta)
+    else: # No objects detected
+        det.dyaw = 0.0 + det.dyaw*(1-beta)
+        det.dz= 0.0 + det.dz*(1-beta)
+        det.dy = 0.0 + det.dy*(1-beta)
+        det.dx = 0.0 + det.dx*(1-beta)
     msg = str(det.n_obj) + ' object(s) detected.'
     rospy.loginfo(msg)
 
 def handle_landing():
-    pass
+    handle_tracking() # By now, just copying tracking algorithm
 
 def camera_callback(data):
     try:

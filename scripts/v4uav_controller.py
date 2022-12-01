@@ -37,11 +37,16 @@ def handle_command(data):
     success = True # Flag to acknowledge if mode transition was successful
     if uav_st.landed == 1: # LANDED_STATE_ON_GROUND
         if data.mode == 'TAKEOFF':
+            if uav_st.mode != 'OFFBOARD': # Check if in autopilot's OFFBOARD mode
+                set_autopilot_mode('OFFBOARD')
             rate = rospy.Rate(20)
             while not uav_st.armed:
                 set_arm()
                 rate.sleep()
+            uav_sp.x_sp = 0.0
+            uav_sp.y_sp = 0.0
             uav_sp.z_sp = data.input_1
+            uav_sp.yaw_sp = 0.0
             msg = 'Take off to ' + str(uav_sp.z_sp) + ' meters.'
             rospy.loginfo(msg)
             reached = False
@@ -158,7 +163,7 @@ def init():
     global v4uav_pub
     v4uav_pub = rospy.Publisher("/v4uav/setpoint", v4uav_setpoint, queue_size=10)
     # Step 3: Declare global variables
-    global uav_pos, uav_st, uav_sp, uav_det, reached, ptl_dist, dyaw_low_thr, dyaw_upp_thr, kpx, kpy, kpz
+    global uav_pos, uav_st, uav_sp, uav_det, reached, ptl_dist, dyaw_low_thr, dyaw_upp_thr, kpx, kpy, kpz, count_non_det
     uav_pos = uavPosition() # Global object to store the vehicle's position
     uav_st = uavState() # Global object to store the vehicle's state
     uav_sp = uavSetpoint() # Global object to store the vehicle's setpoint
@@ -168,6 +173,7 @@ def init():
     dyaw_low_thr = 0.0873 # Threshold value below which we don't act in yaw, to avoid zig zag effects
     dyaw_upp_thr = 1.309 # Threshold value above which we don't act in yaw and switch to HOLD
     kpx, kpy, kpz = (0.1, 0.1, 1.0) # P controller gains in run_control function
+    count_non_det = 0 # Successive non-detections counter
     # Step 4: Set OFFBOARD mode
     set_autopilot_mode('OFFBOARD')
     # If successful, we are ready to takeoff
@@ -208,7 +214,7 @@ def per_delta(target, actual):
     if max(target, actual) == 0.0:
         return 0.0
     else:
-        return abs(target-actual)/max(target, actual) # Is there a better way?
+        return abs(target-actual)/max(abs(target), abs(actual)) # Is there a better way?
 
 def check_goal(inspection=False):
     dx = per_delta(uav_sp.x_sp, uav_pos.x)
@@ -226,10 +232,6 @@ def check_goal(inspection=False):
             return False
     else: # If in modes TRACKING or LANDING
         return True if dyaw < 0.1 else False
-        # if (dyaw < 0.1):
-        #     return True
-        # else:
-        #     return False
 
 def update_states():
     msg = 'Updating the vehicle states.'
@@ -252,27 +254,44 @@ def update_setpoint():
     # Step 1: Call detection service
     get_detection_client()
 
-def run_control():
+def run_control(mode):
     msg = 'Running the controllers'
     #rospy.loginfo(msg)
-    global ptl_dist, dyaw_thr, reached, kpx, kpy, kpz
-    # Step 1: Convert distance errors into velocity setpoints
-    uav_sp.vx_sp = uav_det.dx*kpx
-    uav_sp.vy_sp = uav_det.dy*kpy
-    uav_sp.vz_sp = (ptl_dist - uav_det.dz)*kpz
-    # Step 2: Adjust yaw setpoint
-    if abs(uav_det.dyaw) > abs(dyaw_upp_thr): # dyaw above 75 degrees
-        # Sharp discontinuity ahead. Hold and wait user command
-        msg = 'Sharp discontinuity ahead. Waiting for user command'
+    global ptl_dist, dyaw_upp_thr, dyaw_low_thr, reached, kpx, kpy, kpz, count_non_det
+    # Step 1: Check if the vehicle is stuck somewhere (multiple non-detections)
+    # 20 successive non-detections seems enough
+    if uav_det.n_obj == 0:
+        count_non_det = count_non_det + 1
+    else:
+        count_non_det = 0
+    if count_non_det >= 20: # The vehicle is stuck, switch to HOLD
+        msg = 'Detector was not able to find objects for 20 successive times. Switching to HOLD mode.'
         rospy.logwarn(msg)
         uav_sp.mode = 'HOLD'
         handle_command(uav_sp)
-    elif abs(uav_det.dyaw) < abs(dyaw_low_thr): # dyaw below 5 degrees
-        uav_sp.yaw_sp = uav_pos.yaw
-        reached = False
     else:
-        uav_sp.yaw_sp = uav_pos.yaw + uav_det.dyaw
-        reached = False
+        # Step 2: Convert distance errors into velocity setpoints
+        if mode == 'TRACKING':
+            uav_sp.vx_sp = uav_det.dx*kpx
+            uav_sp.vy_sp = uav_det.dy*kpy
+            uav_sp.vz_sp = (ptl_dist - uav_det.dz)*kpz
+        elif mode == 'LANDING':
+            uav_sp.vx_sp = 0
+            uav_sp.vy_sp = uav_det.dy*kpy
+            uav_sp.vz_sp = -uav_det.dz*kpz
+        # Step 3: Adjust yaw setpoint
+        if abs(uav_det.dyaw) > abs(dyaw_upp_thr): # dyaw above 75 degrees
+            # Sharp discontinuity ahead. Hold and wait user command
+            msg = 'Sharp discontinuity ahead. Waiting for user command'
+            rospy.logwarn(msg)
+            uav_sp.mode = 'HOLD'
+            handle_command(uav_sp)
+        elif abs(uav_det.dyaw) < abs(dyaw_low_thr): # dyaw below 5 degrees
+            uav_sp.yaw_sp = uav_pos.yaw
+            reached = False
+        else:
+            uav_sp.yaw_sp = uav_pos.yaw + uav_det.dyaw
+            reached = False
 
 def send_commands():
     msg = 'Sending MAVROS commands.'
@@ -291,7 +310,7 @@ def controller():
             global reached
             if reached: # Wait to adjust the heading
                 update_setpoint()
-                run_control()
+                run_control(uav_sp.mode)
         # Step 3: Send MAVROS commands
         send_commands()
         rate.sleep()
