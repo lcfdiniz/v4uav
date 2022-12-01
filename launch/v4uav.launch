@@ -1,0 +1,8 @@
+<launch>
+
+	<node pkg='v4uav' type='v4uav_position.py' name='v4uav_position' />
+	<node pkg='v4uav' type='v4uav_state.py' name='v4uav_state' />
+	<node pkg='v4uav' type='v4uav_publisher.py' name='v4uav_publisher' />
+	<node pkg='v4uav' type='v4uav_detector.py' name='v4uav_detector' />
+
+</launch>
