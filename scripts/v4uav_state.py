@@ -35,7 +35,7 @@ def state():
     rospy.Subscriber("/mavros/state", State, st.update_state)
     rospy.Subscriber("/mavros/extended_state", ExtendedState, st.update_extended_state)
     rospy.Service('get_state', GetState, get_state)
-    msg = 'Ready to give states.'
+    msg = '[STATE] Ready to give states.'
     rospy.loginfo(msg)
     rospy.spin() # spin() simply keeps python from exiting until this node is stopped
 

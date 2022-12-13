@@ -101,7 +101,7 @@ def get_dyaw(box):
                 mean_dyaw = abs(mean_dyaw)
         success = True
     else:
-        msg = 'Unable to find lines'
+        msg = '[DETECTOR] Unable to find lines'
         rospy.logwarn(msg)
         success = False
     
@@ -203,7 +203,7 @@ def handle_tracking():
         det.dz= 0.0 + det.dz*(1-beta)
         det.dy = 0.0 + det.dy*(1-beta)
         det.dx = 0.0 + det.dx*(1-beta)
-    msg = str(det.n_obj) + ' object(s) detected.'
+    msg = '[DETECTOR] ' + str(det.n_obj) + ' object(s) detected.'
     rospy.loginfo(msg)
 
 def handle_landing():
@@ -213,28 +213,28 @@ def camera_callback(data):
     try:
         det.detImg = bridge.imgmsg_to_cv2(data, "bgr8")
     except CvBridgeError as e:
-        msg = 'CvBridgeError: ' + str(e)
+        msg = '[DETECTOR] CvBridgeError: ' + str(e)
         rospy.logwarn(msg)
 
 def init():
     # Step 1: Subscribe to Camera images
-    camera_topic = "/iris_fpv_cam/usb_cam/image_raw" # If one changes the vehicle, must also change this line
+    camera_topic = rospy.get_param('/detector/camera_topic') # ROS topic where camera's images are published
     rospy.Subscriber(camera_topic, Image, camera_callback, queue_size=1, buff_size=2**24)
     # Step 2: Declare the global variables
     global v4uav_pub, bridge, det, net, beta, focal_length, ptl_width
     # Step 3: Publish images with bounding boxes to /v4uav/detection
-    v4uav_pub = rospy.Publisher("/v4uav/detection", Image, queue_size=1) # This makes the process slow?
+    v4uav_pub = rospy.Publisher("/v4uav/detection", Image, queue_size=1) # This makes the process slow? Not publishing by now
     # Step 4: Initialize CvBridge object (converts ROS images into OpenCV images)
     bridge = CvBridge()
     # Step 5: Initialize a detection object
     det = uavDetection()
     # Step 6: Define global variables
-    beta = 0.75 # Beta parameter of exponentially weighted averages
-    focal_length = 277.19 # Camera's focal length
-    ptl_width = 11.7 # Distance between the farthest lines, in meters
+    beta = rospy.get_param('/detector/ewa_beta') # Beta parameter of exponentially weighted averages
+    focal_length = rospy.get_param('/detector/camera_focal_length') # Camera's focal length
+    ptl_width = rospy.get_param('/detector/ptl_width') # Distance between the real PTL's farthest lines, in meters
     # Step 7: Loading the model
-    weights_path = '/home/lucas/Documents/GRIn/PTLIR/YOLO/yolov3_training_final.weights' # .weights file path
-    config_path = '/home/lucas/Documents/GRIn/PTLIR/YOLO/yolov3_testing.cfg' # .cfg file path
+    weights_path = rospy.get_param('/detector/weights_path') # .weights file path
+    config_path = rospy.get_param('/detector/config_path') # .cfg file path
     net = cv2.dnn.readNet(weights_path, config_path)
     net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA) # Enabling GPU
     net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
@@ -246,7 +246,7 @@ def get_detection(req):
     elif req.mode == 'LANDING':
         handle_landing()
     else:
-        msg = 'Unrecognized mode. Allowed modes: TRACKING, LANDING'
+        msg = '[DETECTOR] Unrecognized mode. Allowed modes: TRACKING, LANDING'
         rospy.logwarn(msg)
     # Step 2: Return the detection response
     return GetDetectionResponse(det.n_obj, det.dx, det.dy, det.dz, det.dyaw)
@@ -255,7 +255,7 @@ def detector():
     rospy.init_node('v4uav_detector') # Initialize the ROS node for the process
     init() # Initialize the program
     rospy.Service('get_detection', GetDetection, get_detection)
-    msg = 'Ready to detect.'
+    msg = '[DETECTOR] Ready to detect.'
     rospy.loginfo(msg)
     rospy.spin() # spin() simply keeps python from exiting until this node is stopped
 

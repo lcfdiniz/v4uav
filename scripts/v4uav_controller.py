@@ -163,17 +163,20 @@ def init():
     global v4uav_pub
     v4uav_pub = rospy.Publisher("/v4uav/setpoint", v4uav_setpoint, queue_size=10)
     # Step 3: Declare global variables
-    global uav_pos, uav_st, uav_sp, uav_det, reached, ptl_dist, dyaw_low_thr, dyaw_upp_thr, kpx, kpy, kpz, count_non_det
+    global uav_pos, uav_st, uav_sp, uav_det, reached, ptl_dist, dyaw_low_thr, dyaw_upp_thr, kpx, kpy, kpz, count_non_det, non_det_max
     uav_pos = uavPosition() # Global object to store the vehicle's position
     uav_st = uavState() # Global object to store the vehicle's state
     uav_sp = uavSetpoint() # Global object to store the vehicle's setpoint
     uav_det = uavDetection() # Global object to store the detections
     reached = True # Global variable to indicate if the vehicle have reached its goal
-    ptl_dist = 30.0 # Desired distance between the vehicle and the PTL, in meters (TRACKING mode only)
-    dyaw_low_thr = 0.0873 # Threshold value below which we don't act in yaw, to avoid zig zag effects
-    dyaw_upp_thr = 1.309 # Threshold value above which we don't act in yaw and switch to HOLD
-    kpx, kpy, kpz = (0.1, 0.1, 1.0) # P controller gains in run_control function
+    ptl_dist = rospy.get_param('/controller/ptl_dist') # Desired distance between the vehicle and the PTL, in meters (TRACKING mode only)
+    dyaw_low_thr = rospy.get_param('/controller/dyaw_low_thr') # Threshold value below which we don't act in yaw, to avoid zig zag effects
+    dyaw_upp_thr = rospy.get_param('/controller/dyaw_upp_thr') # Threshold value above which we don't act in yaw and switch to HOLD
+    kpx = rospy.get_param('/controller/kpx') # P controller x gain in run_control function
+    kpy = rospy.get_param('/controller/kpy') # P controller y gain in run_control function
+    kpz = rospy.get_param('/controller/kpz') # P controller z gain in run_control function
     count_non_det = 0 # Successive non-detections counter
+    non_det_max = rospy.get_param('/controller/non_det_max') # Max successive non-detections before switching to HOLD mode
     # Step 4: Set OFFBOARD mode
     set_autopilot_mode('OFFBOARD')
     # If successful, we are ready to takeoff
@@ -257,15 +260,16 @@ def update_setpoint():
 def run_control(mode):
     msg = 'Running the controllers'
     #rospy.loginfo(msg)
-    global ptl_dist, dyaw_upp_thr, dyaw_low_thr, reached, kpx, kpy, kpz, count_non_det
+    #global ptl_dist, dyaw_upp_thr, dyaw_low_thr, reached, kpx, kpy, kpz, count_non_det
+    global count_non_det, reached
     # Step 1: Check if the vehicle is stuck somewhere (multiple non-detections)
     # 20 successive non-detections seems enough
     if uav_det.n_obj == 0:
         count_non_det = count_non_det + 1
     else:
         count_non_det = 0
-    if count_non_det >= 20: # The vehicle is stuck, switch to HOLD
-        msg = 'Detector was not able to find objects for 20 successive times. Switching to HOLD mode.'
+    if count_non_det >= non_det_max: # The vehicle is stuck, switch to HOLD
+        msg = 'Detector was not able to find objects for ' + str(non_det_max) + ' successive times. Switching to HOLD mode.'
         rospy.logwarn(msg)
         uav_sp.mode = 'HOLD'
         handle_command(uav_sp)
@@ -280,13 +284,13 @@ def run_control(mode):
             uav_sp.vy_sp = uav_det.dy*kpy
             uav_sp.vz_sp = -uav_det.dz*kpz
         # Step 3: Adjust yaw setpoint
-        if abs(uav_det.dyaw) > abs(dyaw_upp_thr): # dyaw above 75 degrees
+        if abs(uav_det.dyaw) > abs(dyaw_upp_thr): # dyaw above 'dyaw_up_thr' degrees
             # Sharp discontinuity ahead. Hold and wait user command
             msg = 'Sharp discontinuity ahead. Waiting for user command'
             rospy.logwarn(msg)
             uav_sp.mode = 'HOLD'
             handle_command(uav_sp)
-        elif abs(uav_det.dyaw) < abs(dyaw_low_thr): # dyaw below 5 degrees
+        elif abs(uav_det.dyaw) < abs(dyaw_low_thr): # dyaw below 'dyaw_low_thr' degrees
             uav_sp.yaw_sp = uav_pos.yaw
             reached = False
         else:
@@ -307,7 +311,7 @@ def controller():
         update_states()
         # Step 2: Update the vehicle's setpoint when in inspection modes
         if uav_sp.mode in ['TRACKING', 'LANDING']:
-            global reached
+            #global reached
             if reached: # Wait to adjust the heading
                 update_setpoint()
                 run_control(uav_sp.mode)

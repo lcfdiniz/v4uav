@@ -1,0 +1,20 @@
+# V4UAV parameters
+
+# V4UAV Detector parameters
+detector:
+  camera_topic: /iris_fpv_cam/usb_cam/image_raw # ROS topic where camera's images are published
+  weights_path: /home/lucas/Documents/GRIn/PTLIR/YOLO/yolov3_training_final.weights # .weights file path
+  config_path: /home/lucas/Documents/GRIn/PTLIR/YOLO/yolov3_testing.cfg # .cfg file path
+  camera_focal_length: 277.19 # Camera's focal length
+  ptl_width: 11.7 # Distance between the real PTL's farthest lines, in meters
+  ewa_beta: 0.75 # Beta parameter of exponentially weighted averages
+
+# V4UAV Controller parameters
+controller:
+  ptl_dist: 30 # Desired distance between the vehicle and the PTL, in meters (TRACKING mode only)
+  dyaw_low_thr: 0.0873 # Threshold value below which we don't act in yaw, to avoid zig zag effects
+  dyaw_upp_thr: 1.309 # Threshold value above which we don't act in yaw and switch to HOLD
+  kpx: 0.1 # P controller x gain in run_control function
+  kpy: 0.1 # P controller y gain in run_control function
+  kpz: 1.0 # P controller z gain in run_control function
+  non_det_max: 20 # Max successive non-detections before switching to HOLD mode

@@ -42,7 +42,7 @@ def publisher():
     uav_sp = uavSetpoint()
     v4uav_pub = rospy.Publisher("/mavros/setpoint_raw/local", PositionTarget, queue_size=10)
     rospy.Subscriber("/v4uav/setpoint", v4uav_setpoint, uav_sp.update_setpoint)
-    msg = 'Ready to publish setpoints.'
+    msg = '[PUBLISHER] Ready to publish setpoints.'
     rospy.loginfo(msg)
     rate = rospy.Rate(20)
     while not rospy.is_shutdown():

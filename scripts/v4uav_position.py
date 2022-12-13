@@ -35,7 +35,7 @@ def position():
     pos = uavPosition()
     rospy.Subscriber("/mavros/local_position/pose", PoseStamped, pos.update_position)
     rospy.Service('get_position', GetPosition, get_position)
-    msg = 'Ready to give positions.'
+    msg = '[POSITION] Ready to give positions.'
     rospy.loginfo(msg)
     rospy.spin() # spin() simply keeps python from exiting until this node is stopped
 
