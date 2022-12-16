@@ -7,5 +7,6 @@
 	<node pkg='v4uav' type='v4uav_publisher.py' name='v4uav_publisher' output='screen' />
 	<node pkg='v4uav' type='v4uav_detector.py' name='v4uav_detector' output='screen' />
 	<node pkg='v4uav' type='v4uav_controller.py' name='v4uav_controller' output='screen' />
+	<node pkg='v4uav' type='v4uav_interface.py' name='v4uav_interface' />
 
 </launch>
