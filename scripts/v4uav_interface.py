@@ -153,6 +153,19 @@ class MainApp(tk.Frame):
         self.toolbar.pack(side='top', fill='x')
         self.commander.pack(side='left', fill='both', expand=True)
         self.controller.pack(side='left', fill='both', expand=True)
+        # Step 5: Bind scales with keyboard
+        self.parent.bind("<w>", lambda e: self.controller.slider_x.set(self.controller.slider_x.get()+0.1))
+        self.parent.bind("<W>", lambda e: self.controller.slider_x.set(self.controller.slider_x.get()+0.1))
+        self.parent.bind("<s>", lambda e: self.controller.slider_x.set(self.controller.slider_x.get()-0.1))
+        self.parent.bind("<S>", lambda e: self.controller.slider_x.set(self.controller.slider_x.get()-0.1))
+        self.parent.bind("<d>", lambda e: self.controller.slider_y.set(self.controller.slider_y.get()+0.1))
+        self.parent.bind("<D>", lambda e: self.controller.slider_y.set(self.controller.slider_y.get()+0.1))
+        self.parent.bind("<a>", lambda e: self.controller.slider_y.set(self.controller.slider_y.get()-0.1))
+        self.parent.bind("<A>", lambda e: self.controller.slider_y.set(self.controller.slider_y.get()-0.1))
+        self.parent.bind("<Up>", lambda e: self.controller.slider_z.set(self.controller.slider_z.get()+0.1))
+        self.parent.bind("<Down>", lambda e: self.controller.slider_z.set(self.controller.slider_z.get()-0.1))
+        self.parent.bind("<Left>", lambda e: self.controller.slider_yaw.set(self.controller.slider_yaw.get()-0.1))
+        self.parent.bind("<Right>", lambda e: self.controller.slider_yaw.set(self.controller.slider_yaw.get()+0.1))
     
     def about(self):
         win = tk.Toplevel()
