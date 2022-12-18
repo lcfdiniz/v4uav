@@ -17,6 +17,7 @@ class uavSetpoint():
         self.vy_sp = 0.0
         self.vz_sp = 0.0
         self.yaw_sp = 0.0
+        self.yaw_rate_sp = 0.0
     
     def update_setpoint(self, data):
         self.mode = data.mode
@@ -27,6 +28,7 @@ class uavSetpoint():
         self.vy_sp = data.vy_sp
         self.vz_sp = data.vz_sp
         self.yaw_sp = data.yaw_sp
+        self.yaw_rate_sp = data.yaw_rate_sp
 
 def shutdown_msg():
     msg = 'V4UAV was shutdown.'
@@ -83,10 +85,16 @@ def handle_command(data):
             rospy.loginfo(msg)
         elif data.mode == 'TRACKING':
             # Nothing to do here, the setpoint will be updated with update_setpoint()
-            pass
+            msg = 'TRACKING mode enabled.'
+            rospy.loginfo(msg)
         elif data.mode == 'LANDING':
             # Nothing to do here, the setpoint will be updated with update_setpoint()
-            pass
+            msg = 'LANDING mode enabled.'
+            rospy.loginfo(msg)
+        elif data.mode == 'MANUAL':
+            # Nothing to do here, the setpoint will be updated from v4uav_interface
+            msg = 'MANUAL mode enabled.'
+            rospy.loginfo(msg)
         elif data.mode == 'RTL':
             set_autopilot_mode('AUTO.RTL')
         elif data.mode == 'TAKEOFF':
@@ -95,8 +103,6 @@ def handle_command(data):
             success = False
     if success:
         uav_sp.mode = data.mode
-        msg = uav_sp.mode + ' mode enabled.'
-        #rospy.loginfo(msg)
 
 def input_callback(data):
     data.mode = data.mode.upper()
@@ -108,11 +114,12 @@ def input_callback(data):
         'HOLD',
         'TRACKING',
         'LANDING',
+        'MANUAL',
         'RTL'
     ]:
         handle_command(data)
     else:
-        msg = 'Unrecognized mode. Allowed modes: TAKEOFF, SET_POS, SET_REL_POS, GET_POS, HOLD, TRACKING, LANDING, and RTL.'
+        msg = 'Unrecognized mode. Allowed modes: TAKEOFF, SET_POS, SET_REL_POS, GET_POS, HOLD, TRACKING, LANDING, MANUAL and RTL.'
         rospy.logwarn(msg)
 
 def publish_sp():
@@ -125,6 +132,7 @@ def publish_sp():
     msg.vy_sp = uav_sp.vy_sp
     msg.vz_sp = uav_sp.vz_sp
     msg.yaw_sp = uav_sp.yaw_sp
+    msg.yaw_rate_sp = uav_sp.yaw_rate_sp
     rate = rospy.Rate(20)
     v4uav_pub.publish(msg)
     rate.sleep()
@@ -163,18 +171,18 @@ def init():
     global v4uav_pub
     v4uav_pub = rospy.Publisher("/v4uav/setpoint", v4uav_setpoint, queue_size=10)
     # Step 3: Declare global variables
-    global uav_pos, uav_st, uav_sp, uav_det, reached, ptl_dist, dyaw_low_thr, dyaw_upp_thr, kpx, kpy, kpz, count_non_det, non_det_max
+    global uav_pos, uav_st, uav_sp, uav_det, reached, ptl_dist, dyaw_upp_thr, kpx, kpy, kpz, kpyaw, count_non_det, non_det_max
     uav_pos = uavPosition() # Global object to store the vehicle's position
     uav_st = uavState() # Global object to store the vehicle's state
     uav_sp = uavSetpoint() # Global object to store the vehicle's setpoint
     uav_det = uavDetection() # Global object to store the detections
     reached = True # Global variable to indicate if the vehicle have reached its goal
     ptl_dist = rospy.get_param('/controller/ptl_dist') # Desired distance between the vehicle and the PTL, in meters (TRACKING mode only)
-    dyaw_low_thr = rospy.get_param('/controller/dyaw_low_thr') # Threshold value below which we don't act in yaw, to avoid zig zag effects
     dyaw_upp_thr = rospy.get_param('/controller/dyaw_upp_thr') # Threshold value above which we don't act in yaw and switch to HOLD
     kpx = rospy.get_param('/controller/kpx') # P controller x gain in run_control function
     kpy = rospy.get_param('/controller/kpy') # P controller y gain in run_control function
     kpz = rospy.get_param('/controller/kpz') # P controller z gain in run_control function
+    kpyaw = rospy.get_param('/controller/kpyaw') # P controller z gain in run_control function
     count_non_det = 0 # Successive non-detections counter
     non_det_max = rospy.get_param('/controller/non_det_max') # Max successive non-detections before switching to HOLD mode
     # Step 4: Set OFFBOARD mode
@@ -219,22 +227,19 @@ def per_delta(target, actual):
     else:
         return abs(target-actual)/max(abs(target), abs(actual)) # Is there a better way?
 
-def check_goal(inspection=False):
+def check_goal():
     dx = per_delta(uav_sp.x_sp, uav_pos.x)
     dy = per_delta(uav_sp.y_sp, uav_pos.y)
     dz = per_delta(uav_sp.z_sp, uav_pos.z)
     dyaw = per_delta(uav_sp.yaw_sp, uav_pos.yaw)
-    if not inspection:
-        if max(dx, dy, dz, dyaw) < 0.1:
-            msg = uav_sp.mode + ' completed.'
-            rospy.loginfo(msg)
-            uav_sp.mode = 'HOLD'
-            handle_command(uav_sp)
-            return True
-        else:
-            return False
-    else: # If in modes TRACKING or LANDING
-        return True if dyaw < 0.1 else False
+    if max(dx, dy, dz, dyaw) < 0.1:
+        msg = uav_sp.mode + ' completed.'
+        rospy.loginfo(msg)
+        uav_sp.mode = 'HOLD'
+        handle_command(uav_sp)
+        return True
+    else:
+        return False
 
 def update_states():
     msg = 'Updating the vehicle states.'
@@ -248,8 +253,6 @@ def update_states():
     if not reached:
         if uav_sp.mode in ['TAKEOFF', 'SET_POS', 'SET_REL_POS']:
             reached = check_goal()
-        elif uav_sp.mode in ['TRACKING', 'LANDING']:
-            reached = check_goal(inspection=True)
 
 def update_setpoint():
     msg = 'Updating the vehicle setpoints'
@@ -268,11 +271,17 @@ def run_control(mode):
         count_non_det = count_non_det + 1
     else:
         count_non_det = 0
-    if count_non_det >= non_det_max: # The vehicle is stuck, switch to HOLD
-        msg = 'Detector was not able to find objects for ' + str(non_det_max) + ' successive times. Switching to HOLD mode.'
-        rospy.logwarn(msg)
-        uav_sp.mode = 'HOLD'
-        handle_command(uav_sp)
+    if count_non_det >= non_det_max: # The vehicle is stuck, switch to HOLD or MANUAL
+        if mode == 'TRACKING':
+            msg = 'Detector was not able to find objects for ' + str(non_det_max) + ' successive times. Switching to HOLD mode.'
+            rospy.logwarn(msg)
+            uav_sp.mode = 'HOLD'
+            handle_command(uav_sp)
+        elif mode == 'LANDING':
+            msg = 'Detector was not able to find objects for ' + str(non_det_max) + ' successive times. Switching to MANUAL mode.'
+            rospy.logwarn(msg)
+            uav_sp.mode = 'MANUAL'
+            handle_command(uav_sp)
     else:
         # Step 2: Convert distance errors into velocity setpoints
         if mode == 'TRACKING':
@@ -290,12 +299,8 @@ def run_control(mode):
             rospy.logwarn(msg)
             uav_sp.mode = 'HOLD'
             handle_command(uav_sp)
-        elif abs(uav_det.dyaw) < abs(dyaw_low_thr): # dyaw below 'dyaw_low_thr' degrees
-            uav_sp.yaw_sp = uav_pos.yaw
-            reached = False
         else:
-            uav_sp.yaw_sp = uav_pos.yaw + uav_det.dyaw
-            reached = False
+            uav_sp.yaw_rate_sp = uav_det.dyaw*kpyaw
 
 def send_commands():
     msg = 'Sending MAVROS commands.'
@@ -311,10 +316,8 @@ def controller():
         update_states()
         # Step 2: Update the vehicle's setpoint when in inspection modes
         if uav_sp.mode in ['TRACKING', 'LANDING']:
-            #global reached
-            if reached: # Wait to adjust the heading
-                update_setpoint()
-                run_control(uav_sp.mode)
+            update_setpoint()
+            run_control(uav_sp.mode)
         # Step 3: Send MAVROS commands
         send_commands()
         rate.sleep()

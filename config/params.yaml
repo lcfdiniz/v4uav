@@ -12,9 +12,16 @@ detector:
 # V4UAV Controller parameters
 controller:
   ptl_dist: 30 # Desired distance between the vehicle and the PTL, in meters (TRACKING mode only)
-  dyaw_low_thr: 0.0873 # Threshold value below which we don't act in yaw, to avoid zig zag effects
-  dyaw_upp_thr: 1.309 # Threshold value above which we don't act in yaw and switch to HOLD
+  dyaw_upp_thr: 1.4835 # Threshold value above which we don't act in yaw and switch to HOLD
   kpx: 0.1 # P controller x gain in run_control function
   kpy: 0.1 # P controller y gain in run_control function
   kpz: 1.0 # P controller z gain in run_control function
-  non_det_max: 20 # Max successive non-detections before switching to HOLD mode
+  kpyaw: 0.5 # P controller yaw gain in run_control function
+  non_det_max: 20 # Max successive non-detections before switching to HOLD or MANUAL mode
+
+# V4UAV Interface parameters
+interface:
+  max_vx: 2 # Maximum X velocity (m/s) when in MANUAL mode
+  max_vy: 2 # Maximum Y velocity (m/s) when in MANUAL mode
+  max_vz: 5 # Maximum Z velocity (m/s) when in MANUAL mode
+  max_yaw_rate: 0.087 # Maximum yaw rate (rad/s) when in MANUAL mode

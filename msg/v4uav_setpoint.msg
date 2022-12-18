@@ -6,3 +6,4 @@ float64 vx_sp
 float64 vy_sp
 float64 vz_sp
 float64 yaw_sp
+float64 yaw_rate_sp

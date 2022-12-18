@@ -25,14 +25,14 @@ class CommanderApp(tk.Frame):
         tk.Label(self, text='Commander', font=('TkDefaultFont', 12,'bold'), fg='white', bg='#02577a').pack(pady=10)
         self.config(background='#02577a')
         self.n_inputs = {'TAKEOFF': 1, 'SET_POS': 4, 'SET_REL_POS': 4, 'HOLD': 0, 
-                        'GET_POS': 0, 'TRACKING': 0, 'LANDING': 0, 'RTL': 0}
+                        'GET_POS': 0, 'TRACKING': 0, 'LANDING': 0, 'MANUAL': 0, 'RTL': 0} # LUCAS AQUI
         # Step 2: Structuring layout
         self.inputs_box = tk.Frame(self)
         self.inputs_box.config(background='#02577a')
         # Step 3: Adding widgets
         self.combobox = ttk.Combobox(self.inputs_box)
         self.combobox['values'] = ('TAKEOFF', 'SET_POS', 'SET_REL_POS', 'HOLD', 
-                                    'GET_POS', 'TRACKING', 'LANDING', 'RTL')
+                                    'GET_POS', 'TRACKING', 'LANDING', 'MANUAL', 'RTL') # LUCAS AQUI
         self.combobox['state'] = 'readonly'
         self.combobox.bind('<<ComboboxSelected>>', self.enable_inputs)
         tk.Label(self.inputs_box, text="V4UAV mode:", fg='white', bg='#02577a').pack()
@@ -116,10 +116,10 @@ class ControllerApp(tk.Frame):
     
     def send_msg(self, event):
         msg = v4uav_setpoint()
-        msg.vx_sp = self.slider_x.get()
-        msg.vy_sp = self.slider_y.get()
-        msg.vz_sp = self.slider_z.get()
-        msg.yaw_sp = self.slider_yaw.get()
+        msg.vx_sp = self.slider_x.get()*max_vx
+        msg.vy_sp = self.slider_y.get()*max_vy
+        msg.vz_sp = self.slider_z.get()*max_vz
+        msg.yaw_rate_sp = self.slider_yaw.get()*max_yaw_rate
         rate = rospy.Rate(20)
         input_pub.publish(msg)
         rate.sleep()
@@ -162,10 +162,14 @@ class MainApp(tk.Frame):
         self.parent.bind("<D>", lambda e: self.controller.slider_y.set(self.controller.slider_y.get()+0.1))
         self.parent.bind("<a>", lambda e: self.controller.slider_y.set(self.controller.slider_y.get()-0.1))
         self.parent.bind("<A>", lambda e: self.controller.slider_y.set(self.controller.slider_y.get()-0.1))
-        self.parent.bind("<Up>", lambda e: self.controller.slider_z.set(self.controller.slider_z.get()+0.1))
-        self.parent.bind("<Down>", lambda e: self.controller.slider_z.set(self.controller.slider_z.get()-0.1))
-        self.parent.bind("<Left>", lambda e: self.controller.slider_yaw.set(self.controller.slider_yaw.get()-0.1))
-        self.parent.bind("<Right>", lambda e: self.controller.slider_yaw.set(self.controller.slider_yaw.get()+0.1))
+        self.parent.bind("<i>", lambda e: self.controller.slider_z.set(self.controller.slider_z.get()+0.1))
+        self.parent.bind("<I>", lambda e: self.controller.slider_z.set(self.controller.slider_z.get()+0.1))
+        self.parent.bind("<k>", lambda e: self.controller.slider_z.set(self.controller.slider_z.get()-0.1))
+        self.parent.bind("<K>", lambda e: self.controller.slider_z.set(self.controller.slider_z.get()-0.1))
+        self.parent.bind("<l>", lambda e: self.controller.slider_yaw.set(self.controller.slider_yaw.get()-0.1))
+        self.parent.bind("<L>", lambda e: self.controller.slider_yaw.set(self.controller.slider_yaw.get()-0.1))
+        self.parent.bind("<j>", lambda e: self.controller.slider_yaw.set(self.controller.slider_yaw.get()+0.1))
+        self.parent.bind("<J>", lambda e: self.controller.slider_yaw.set(self.controller.slider_yaw.get()+0.1))
     
     def about(self):
         win = tk.Toplevel()
@@ -187,7 +191,13 @@ def interface():
     global command_pub, input_pub
     command_pub = rospy.Publisher("/v4uav/command", v4uav_command, queue_size=10)
     input_pub = rospy.Publisher("/v4uav/input", v4uav_setpoint, queue_size=10)
-    # Step 2: Creating Tkinter interface
+    # Step 2: Declare global variables
+    global max_vx, max_vy, max_vz, max_yaw_rate
+    max_vx = rospy.get_param('/interface/max_vx')
+    max_vy = rospy.get_param('/interface/max_vy')
+    max_vz = rospy.get_param('/interface/max_vz')
+    max_yaw_rate = rospy.get_param('/interface/max_yaw_rate')
+    # Step 3: Creating Tkinter interface
     root = tk.Tk()
     MainApp(root).pack(side="top", fill="both", expand=True)
     root.mainloop() # We don't need rospy.spin() since root.mainloop() will keep the program running
