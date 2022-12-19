@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 import rospy
+import numpy as np
 from std_msgs.msg import Header
 from mavros_msgs.msg import PositionTarget
 from v4uav_controller import uavSetpoint
 from v4uav.msg import v4uav_setpoint
+
+def ratio_detector_input(dz):
+    return (1/(1+np.exp(-(dz-6.0))))
 
 def fill_msg(msg):
     if uav_sp.mode == 'MANUAL':
@@ -17,10 +21,11 @@ def fill_msg(msg):
         msg.velocity.z = uav_sp.vz_sp
         msg.yaw_rate = uav_sp.yaw_rate_sp
     elif uav_sp.mode == 'LANDING': # Mix uav_sp and input_sp
-        msg.velocity.x = uav_sp.vx_sp
-        msg.velocity.y = uav_sp.vy_sp
-        msg.velocity.z = uav_sp.vz_sp
-        msg.yaw_rate = uav_sp.yaw_rate_sp
+        alpha = ratio_detector_input(-uav_sp.vz_sp/kpz)
+        msg.velocity.x = alpha*(uav_sp.vx_sp) + (1-alpha)*(input_sp.vx_sp)
+        msg.velocity.y = alpha*(uav_sp.vy_sp) + (1-alpha)*(-input_sp.vy_sp)
+        msg.velocity.z = alpha*(uav_sp.vz_sp) + (1-alpha)*(input_sp.vz_sp)
+        msg.yaw_rate = alpha*(uav_sp.yaw_rate_sp) + (1-alpha)*(input_sp.yaw_rate_sp)
     else:
         msg.position.x = uav_sp.x_sp
         msg.position.y = uav_sp.y_sp
@@ -53,10 +58,11 @@ def publish_sp():
 
 def publisher():
     rospy.init_node('v4uav_publisher')
-    global uav_sp, input_sp, v4uav_pub
+    global uav_sp, input_sp, v4uav_pub, kpz
     uav_sp = uavSetpoint()
     input_sp = uavSetpoint()
     v4uav_pub = rospy.Publisher("/mavros/setpoint_raw/local", PositionTarget, queue_size=10)
+    kpz = rospy.get_param('/controller/kpz')
     rospy.Subscriber("/v4uav/setpoint", v4uav_setpoint, uav_sp.update_setpoint)
     rospy.Subscriber("/v4uav/input", v4uav_setpoint, input_sp.update_setpoint)
     msg = '[PUBLISHER] Ready to publish setpoints.'
