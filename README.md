@@ -1,5 +1,4 @@
 # V4UAV
-ROS package to control UAVs in power transmission line inspection task using computer vision techniques.
 
 **About**: This is a complete system to assist human operator in power transmission lines inspection/maintanence routines with unmanned aerial vehicles (UAVs).
 With the help of deep learning models, the program is capable of detecting the lines, estimating its position in relation to the drone and performing the designated action: 
@@ -19,7 +18,7 @@ The following (optional) software is necessary to run the program properly:
 
 - [**CUDA and CuDNN**](https://pyimagesearch.com/2020/02/03/how-to-use-opencvs-dnn-module-with-nvidia-gpus-cuda-and-cudnn/)
 
-The link above also cover OpenCV instalation, the only (non-native) python library you will need.
+The link above also cover OpenCV instalation, the only aditional, non-native, python library you will need.
 
 ## Installing
 
@@ -44,35 +43,27 @@ This will run PX4 Autopilot and wait for the simulator.
 
 ```
 source Tools/setup_gazebo.bash $(pwd) $(pwd)/build/px4_sitl_default
-roslaunch gazebo_ros empty_world.launch world_name:=$(pwd)/Tools/sitl_gazebo/worlds/v4uav.world
+roslaunch v4uav gazebo_ros.launch
 ```
 
-The world file v4uav.world will be available soon in the `assets` folder. Make sure to put it in the specified folder, inside PX4 Autopilot pile.
+The `assets/gazebo/models` directory needs to be added to the GAZEBO_MODEL_PATH environment variable. It should be [PATH_TO_PX4_AUTOPILOT]/Tools/sitl_gazebo/models.
 
-In this step, you need to place the drone (Iris 3DR with FPV camera recommended) somewhere in the world scenario.
-
-- **Third terminal**: Launch MAVROS
-
-```
-roslaunch mavros px4.launch fcu_url:="udp://:14540@192.168.1.36:14557"
-```
-
-- **Forth terminal**: Run QGroundControl
+- **Third terminal**: Run QGroundControl
 
 ```
 cd [PATH_TO_QGROUNDCONTROL]
 ./QGroundControl.AppImage
 ```
 
-- **Fifth terminal**: Launch V4UAV
+- **Fourth terminal**: Launch V4UAV
 
 ```
 roslaunch v4uav v4uav.launch
 ```
 
-You are ready to go! All the program logging will be displayed in the fifth terminal. The following window (V4UAV interface) will pop up:
+You are ready to go! All the program logging will be displayed in the fourth terminal. The following window (V4UAV interface) will pop up:
 
-![alt text](https://github.com/lcfdiniz/V4UAV/blob/main/assets/v4uav_interface.png?raw=true)
+![alt text](https://github.com/lcfdiniz/V4UAV/blob/main/assets/images/v4uav_interface.png?raw=true)
 
 ## How it works
 
@@ -85,15 +76,17 @@ The interface has two major portions: Commander and Controller.
 
 In this frame, you have to set a V4UAV mode and up to four inputs. The following modes are available:
 
-- TAKEOFF: The first mode you will need to use in order to fly the drone. The only input is the altitude, in meters
-- SET_POS: Set the vehicle global position according to four inputs: X, Y, Z and Yaw
-- SET_REL_POS: Set the new vehicle position based on four inputs: offsets in X, Y, Z and Yaw
-- HOLD: Hold the vehicle position (no inputs)
-- GET_POS: Prints the vehicle current position (no inputs)
-- TRACKING: Enable the vehicle to track power transmission lines (no inputs)
-- LANDING: Enable the vehicle to land in power transmission lines (no inputs)
-- MANUAL: Control the vehicle manually with the Controller frame (no inputs)
-- RTL: Return to the starting position and land (no inputs)
+| mode | description | input 1 | input 2 | input 3 | input 4 |
+|:-:|:-:|:-:|:-:|:-:|:-:|
+| TAKEOFF | Takeoff the drone to a certain altitude | Z position (m) | x | x | x |
+| SET_POS | Set the vehicle global position | X position (m) |  Y position (m) | Z position (m) | Yaw angle (rad) |
+| SET_REL_POS | Set offsets on drone's position | X offset (m) |  Y offset (m) | Z offset (m) | Yaw offset (rad) |
+| HOLD | Hold the drone at current position | x | x | x | x |
+| GET_POS | Get the drone's current position | x | x | x | x |
+| TRACKING | Enable power transmission lines tracking | x | x | x | x |
+| LANDING | Land in power transmission lines | x | x | x | x |
+| MANUAL | Control the drone's movement manually | x | x | x | x |
+| RTL | Return to starting position and land | x | x | x | x |
 
 ### Controller
 
@@ -118,7 +111,9 @@ You could also use the keyboard!
 The picture below show the vehicle landing in the power transmission line. With V4UAV, you will be able to safely navigate the drone through the lines and also land on it.
 This can make inspection/maintenence routines faster, safer and more effective!
 
-![alt text](https://github.com/lcfdiniz/V4UAV/blob/main/assets/v4uav_gazebo.png?raw=true)
+![alt text](https://github.com/lcfdiniz/V4UAV/blob/main/assets/images/v4uav_gazebo.png?raw=true)
+
+Futhermore, check out the [article](https://link.springer.com/article/10.1007/s10846-022-01725-x) wrote about this project!
 
 ## Questions?
 
