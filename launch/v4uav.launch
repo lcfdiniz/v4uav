@@ -1,12 +1,14 @@
 <launch>
 
-	<rosparam command='load' file='$(find v4uav)/config/params.yaml' />
+  <!-- Parameter server -->  
+  <rosparam command='load' file='$(find v4uav)/config/params.yaml' />
 
-	<node pkg='v4uav' type='v4uav_position.py' name='v4uav_position' output='screen' />
-	<node pkg='v4uav' type='v4uav_state.py' name='v4uav_state' output='screen' />
-	<node pkg='v4uav' type='v4uav_publisher.py' name='v4uav_publisher' output='screen' />
-	<node pkg='v4uav' type='v4uav_detector.py' name='v4uav_detector' output='screen' />
-	<node pkg='v4uav' type='v4uav_controller.py' name='v4uav_controller' output='screen' />
-	<node pkg='v4uav' type='v4uav_interface.py' name='v4uav_interface' />
+  <!-- V4UAV nodes -->	
+  <node pkg='v4uav' type='v4uav_position.py' name='v4uav_position' output='screen' />
+  <node pkg='v4uav' type='v4uav_state.py' name='v4uav_state' output='screen' />
+  <node pkg='v4uav' type='v4uav_publisher.py' name='v4uav_publisher' output='screen' />
+  <node pkg='v4uav' type='v4uav_detector.py' name='v4uav_detector' output='screen' />
+  <node pkg='v4uav' type='v4uav_controller.py' name='v4uav_controller' output='screen' />
+  <node pkg='v4uav' type='v4uav_interface.py' name='v4uav_interface' />
 
 </launch>

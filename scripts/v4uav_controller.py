@@ -89,6 +89,9 @@ def handle_command(data):
             rospy.loginfo(msg)
         elif data.mode == 'LANDING':
             # Nothing to do here, the setpoint will be updated with update_setpoint()
+            rospy.set_param('/controller/start_dz', uav_pos.z)
+            min_dz = rospy.get_param('/detector/min_dz')
+            rospy.set_param('/controller/end_dz', uav_pos.z-(uav_det.dz-min_dz))
             msg = 'LANDING mode enabled.'
             rospy.loginfo(msg)
         elif data.mode == 'MANUAL':
@@ -185,7 +188,10 @@ def init():
     kpyaw = rospy.get_param('/controller/kpyaw') # P controller z gain in run_control function
     count_non_det = 0 # Successive non-detections counter
     non_det_max = rospy.get_param('/controller/non_det_max') # Max successive non-detections before switching to HOLD mode
-    # Step 4: Set OFFBOARD mode
+    # Step 4: Cold start 'start_dz' and 'end_dz' parameters (LANDING mode)
+    rospy.set_param('/controller/start_dz', 0.0) # Z position where the vehicle engages LANDING mode
+    rospy.set_param('/controller/end_dz', 0.0) # Z position from which PTL boundaries are still within camera's image
+    # Step 5: Set OFFBOARD mode
     set_autopilot_mode('OFFBOARD')
     # If successful, we are ready to takeoff
     msg = 'Ready to takeoff.'
@@ -263,7 +269,6 @@ def update_setpoint():
 def run_control(mode):
     msg = 'Running the controllers'
     #rospy.loginfo(msg)
-    #global ptl_dist, dyaw_upp_thr, dyaw_low_thr, reached, kpx, kpy, kpz, count_non_det
     global count_non_det, reached
     # Step 1: Check if the vehicle is stuck somewhere (multiple non-detections)
     # 20 successive non-detections seems enough
@@ -271,7 +276,25 @@ def run_control(mode):
         count_non_det = count_non_det + 1
     else:
         count_non_det = 0
-    if count_non_det >= non_det_max: # The vehicle is stuck, switch to HOLD or MANUAL
+        # Step 2: Check if dyaw is above 'dyaw_up_thr' radians
+        if abs(uav_det.dyaw) > abs(dyaw_upp_thr):
+            # Sharp discontinuity ahead. Hold and wait user command
+            msg = 'Sharp discontinuity ahead. Waiting for user command'
+            rospy.logwarn(msg)
+            uav_sp.mode = 'HOLD'
+            handle_command(uav_sp)
+        else:
+            uav_sp.yaw_rate_sp = uav_det.dyaw*kpyaw
+            uav_sp.vy_sp = uav_det.dy*kpy
+            if mode == 'TRACKING':
+                uav_sp.vx_sp = uav_det.dx*kpx
+                uav_sp.vz_sp = (ptl_dist - uav_det.dz)*kpz
+            elif mode == 'LANDING':
+                uav_sp.z_sp = uav_pos.z
+                uav_sp.vx_sp = 0
+                uav_sp.vz_sp = -uav_det.dz*kpz
+    # Step 3: If the vehicle is stuck, switch to HOLD or MANUAL
+    if count_non_det >= non_det_max: # Vehicle is stuck
         if mode == 'TRACKING':
             msg = 'Detector was not able to find objects for ' + str(non_det_max) + ' successive times. Switching to HOLD mode.'
             rospy.logwarn(msg)
@@ -282,25 +305,6 @@ def run_control(mode):
             rospy.logwarn(msg)
             uav_sp.mode = 'MANUAL'
             handle_command(uav_sp)
-    else:
-        # Step 2: Convert distance errors into velocity setpoints
-        if mode == 'TRACKING':
-            uav_sp.vx_sp = uav_det.dx*kpx
-            uav_sp.vy_sp = uav_det.dy*kpy
-            uav_sp.vz_sp = (ptl_dist - uav_det.dz)*kpz
-        elif mode == 'LANDING':
-            uav_sp.vx_sp = 0
-            uav_sp.vy_sp = uav_det.dy*kpy
-            uav_sp.vz_sp = -uav_det.dz*kpz
-        # Step 3: Adjust yaw setpoint
-        if abs(uav_det.dyaw) > abs(dyaw_upp_thr): # dyaw above 'dyaw_up_thr' degrees
-            # Sharp discontinuity ahead. Hold and wait user command
-            msg = 'Sharp discontinuity ahead. Waiting for user command'
-            rospy.logwarn(msg)
-            uav_sp.mode = 'HOLD'
-            handle_command(uav_sp)
-        else:
-            uav_sp.yaw_rate_sp = uav_det.dyaw*kpyaw
 
 def send_commands():
     msg = 'Sending MAVROS commands.'

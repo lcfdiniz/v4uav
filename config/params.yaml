@@ -3,19 +3,20 @@
 # V4UAV Detector parameters
 detector:
   camera_topic: /iris_fpv_cam/usb_cam/image_raw # ROS topic where camera's images are published
-  weights_path: /home/lucas/Documents/GRIn/PTLIR/YOLO/yolov3_training_final.weights # .weights file path
-  config_path: /home/lucas/Documents/GRIn/PTLIR/YOLO/yolov3_testing.cfg # .cfg file path
+  weights_path: /home/lucas/catkin_ws/src/v4uav/assets//model/v4uav.weights # .weights file path
+  config_path: /home/lucas/catkin_ws/src/v4uav/assets/model/v4uav.cfg # .cfg file path
   camera_focal_length: 277.19 # Camera's focal length
-  ptl_width: 11.7 # Distance between the real PTL's farthest lines, in meters
-  ewa_beta: 0.75 # Beta parameter of exponentially weighted averages
+  ptl_width: 26.2 # Distance between the real PTL's farthest lines, in meters
+  ewa_beta: 0.8 # Beta parameter of exponentially weighted averages
+  dyaw_low_thr: 0.1745 # Threshold value below which we can control other states (dx, dy, dz)
 
 # V4UAV Controller parameters
 controller:
-  ptl_dist: 30 # Desired distance between the vehicle and the PTL, in meters (TRACKING mode only)
+  ptl_dist: 35 # Desired distance between the vehicle and the PTL, in meters (TRACKING mode only)
   dyaw_upp_thr: 1.4835 # Threshold value above which we don't act in yaw and switch to HOLD
   kpx: 0.1 # P controller x gain in run_control function
   kpy: 0.1 # P controller y gain in run_control function
-  kpz: 1.0 # P controller z gain in run_control function
+  kpz: 0.5 # P controller z gain in run_control function
   kpyaw: 0.5 # P controller yaw gain in run_control function
   non_det_max: 20 # Max successive non-detections before switching to HOLD or MANUAL mode
 

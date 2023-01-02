@@ -1,0 +1,146 @@
+<?xml version='1.0'?>
+<sdf version='1.6'>
+  <model name='v4uav_simple_circuit_line'>
+    <link name='link'>
+      <self_collide>0</self_collide>
+      <enable_wind>0</enable_wind>
+      <kinematic>0</kinematic>
+      <pose frame=''>0 0 0 1.5708 -0 0</pose>
+      <gravity>1</gravity>
+      <inertial>
+        <mass>1</mass>
+        <pose frame=''>0 0 0 1.5708 -0 0</pose>
+        <inertia>
+          <ixx>1</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1</iyy>
+          <iyz>0</iyz>
+          <izz>1</izz>
+        </inertia>
+      </inertial>
+      <visual name='ModelPreview_1::link::visual_1'>
+        <cast_shadows>0</cast_shadows>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>100</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <shader type='pixel'>
+            <normal_map>__default__</normal_map>
+          </shader>
+          <script>
+            <name>ModelPreview_33::link::visual_MATERIAL_</name>
+            <uri>__default__</uri>
+          </script>
+          <ambient>0 0 0 1</ambient>
+          <diffuse>0 0 0 1</diffuse>
+          <specular>0 0 0 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+        <pose frame=''>-5.5 40 0 0 -0 0</pose>
+        <transparency>0</transparency>
+      </visual>
+      <visual name='visual'>
+        <cast_shadows>0</cast_shadows>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>100</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <shader type='pixel'>
+            <normal_map>__default__</normal_map>
+          </shader>
+          <script>
+            <name>ModelPreview_33::link::visual_MATERIAL_</name>
+            <uri>__default__</uri>
+          </script>
+          <ambient>0 0 0 1</ambient>
+          <diffuse>0 0 0 1</diffuse>
+          <specular>0 0 0 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+        <pose frame=''>5.5 40 0 0 -0 0</pose>
+        <transparency>0</transparency>
+      </visual>
+      <visual name='ModelPreview_1::link::visual_4'>
+        <cast_shadows>0</cast_shadows>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>100</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <shader type='pixel'>
+            <normal_map>__default__</normal_map>
+          </shader>
+          <script>
+            <name>ModelPreview_33::link::visual_MATERIAL_</name>
+            <uri>__default__</uri>
+          </script>
+          <ambient>0 0 0 1</ambient>
+          <diffuse>0 0 0 1</diffuse>
+          <specular>0 0 0 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+        <pose frame=''>0 30.64 0 0 -0 0</pose>
+        <transparency>0</transparency>
+      </visual>
+      <visual name='ModelPreview_1::link::visual_3'>
+        <cast_shadows>0</cast_shadows>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>100</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <shader type='pixel'>
+            <normal_map>__default__</normal_map>
+          </shader>
+          <script>
+            <name>ModelPreview_33::link::visual_MATERIAL_</name>
+            <uri>__default__</uri>
+          </script>
+          <ambient>0 0 0 1</ambient>
+          <diffuse>0 0 0 1</diffuse>
+          <specular>0 0 0 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+        <pose frame=''>-13.1 31.42 0 0 -0 0</pose>
+        <transparency>0</transparency>
+      </visual>
+      <visual name='ModelPreview_1::link::visual_2'>
+        <cast_shadows>0</cast_shadows>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>100</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <shader type='pixel'>
+            <normal_map>__default__</normal_map>
+          </shader>
+          <script>
+            <name>ModelPreview_33::link::visual_MATERIAL_</name>
+            <uri>__default__</uri>
+          </script>
+          <ambient>0 0 0 1</ambient>
+          <diffuse>0 0 0 1</diffuse>
+          <specular>0 0 0 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+        <pose frame=''>13.1 31.42 0 0 -0 0</pose>
+        <transparency>0</transparency>
+      </visual>
+    </link>
+    <static>1</static>
+    <allow_auto_disable>1</allow_auto_disable>
+  </model>
+</sdf>

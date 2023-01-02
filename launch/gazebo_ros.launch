@@ -1,0 +1,13 @@
+<launch>
+
+  <!-- Gazebo -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find v4uav)/assets/gazebo/worlds/v4uav.world"/>
+  </include>
+
+  <!-- MAVROS -->  
+  <include file="$(find mavros)/launch/px4.launch">
+    <arg name="fcu_url" value="udp://:14540@192.168.1.36:14557"/>
+  </include>
+
+</launch>

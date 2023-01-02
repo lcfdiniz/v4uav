@@ -13,7 +13,7 @@ class ToolbarApp(tk.Frame):
         # Step 1: Frame configuration
         self.parent = parent # MainApp frame
         self.config(background='#ffffff')
-        logo_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'assets/v4uav_logo.png'))
+        logo_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'assets/images/v4uav_logo.png'))
         self.logo = tk.PhotoImage(file=logo_path).subsample(10,10)
         tk.Label(self, image=self.logo, bg='#ffffff').pack(side='left')
         tk.Label(self, text='V4UAV', font=('TkDefaultFont', 14,'bold'), fg='#3e3e3e', bg='#ffffff').pack(side='left', pady=10, padx=10)
@@ -25,14 +25,14 @@ class CommanderApp(tk.Frame):
         tk.Label(self, text='Commander', font=('TkDefaultFont', 12,'bold'), fg='white', bg='#02577a').pack(pady=10)
         self.config(background='#02577a')
         self.n_inputs = {'TAKEOFF': 1, 'SET_POS': 4, 'SET_REL_POS': 4, 'HOLD': 0, 
-                        'GET_POS': 0, 'TRACKING': 0, 'LANDING': 0, 'MANUAL': 0, 'RTL': 0} # LUCAS AQUI
+                        'GET_POS': 0, 'TRACKING': 0, 'LANDING': 0, 'MANUAL': 0, 'RTL': 0}
         # Step 2: Structuring layout
         self.inputs_box = tk.Frame(self)
         self.inputs_box.config(background='#02577a')
         # Step 3: Adding widgets
         self.combobox = ttk.Combobox(self.inputs_box)
         self.combobox['values'] = ('TAKEOFF', 'SET_POS', 'SET_REL_POS', 'HOLD', 
-                                    'GET_POS', 'TRACKING', 'LANDING', 'MANUAL', 'RTL') # LUCAS AQUI
+                                    'GET_POS', 'TRACKING', 'LANDING', 'MANUAL', 'RTL')
         self.combobox['state'] = 'readonly'
         self.combobox.bind('<<ComboboxSelected>>', self.enable_inputs)
         tk.Label(self.inputs_box, text="V4UAV mode:", fg='white', bg='#02577a').pack()
@@ -54,7 +54,7 @@ class CommanderApp(tk.Frame):
         for i in reversed(range(self.n_inputs[mode], 4)):
             self.inputs[i].configure(state='disabled')
     
-    def fill_msg(self):
+    def fill_msg(self, event=None):
         mode = self.combobox.get()
         if mode != '':
             self.command = [mode]
@@ -131,7 +131,7 @@ class MainApp(tk.Frame):
         self.parent.title('V4UAV')
         self.parent.geometry("800x400")
         # Step 2: Setting the icon
-        icon_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'assets/v4uav_icon.png'))
+        icon_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'assets/images/v4uav_icon.png'))
         self.icon = tk.PhotoImage(file=icon_path)
         self.parent.tk.call('wm', 'iconphoto', self.parent._w, self.icon)
         # Step 3: Creating the menu bar
@@ -170,6 +170,7 @@ class MainApp(tk.Frame):
         self.parent.bind("<L>", lambda e: self.controller.slider_yaw.set(self.controller.slider_yaw.get()-0.1))
         self.parent.bind("<j>", lambda e: self.controller.slider_yaw.set(self.controller.slider_yaw.get()+0.1))
         self.parent.bind("<J>", lambda e: self.controller.slider_yaw.set(self.controller.slider_yaw.get()+0.1))
+        self.parent.bind("<Return>", self.commander.fill_msg)
     
     def about(self):
         win = tk.Toplevel()
