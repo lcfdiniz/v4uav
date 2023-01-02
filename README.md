@@ -113,7 +113,7 @@ This can make inspection/maintenence routines faster, safer and more effective!
 
 ![alt text](https://github.com/lcfdiniz/V4UAV/blob/main/assets/images/v4uav_gazebo.png?raw=true)
 
-Futhermore, check out the [article](https://link.springer.com/article/10.1007/s10846-022-01725-x) wrote about this project!
+Furthermore, check out the [article](https://link.springer.com/article/10.1007/s10846-022-01725-x) wrote about this project!
 
 ## Questions?
 
