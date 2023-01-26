@@ -61,13 +61,16 @@ def get_dyaw(box):
     # Step 3: Applying filters
     gray = cv2.cvtColor(obj,cv2.COLOR_BGR2GRAY) # Convert image to grayscale
     blur = cv2.GaussianBlur(gray,(5, 5),0) # Remove noise applying blur
-    edges = cv2.Canny(blur, 75, 150) # Identify edges
+    edges = cv2.Canny(blur, 50, 125) # Identify edges
+    dilate = cv2.dilate(edges, np.ones((5,5), np.uint8), iterations=1) # Dilate the identified edges
+    erode = cv2.erode(dilate, np.ones((5,5), np.uint8), iterations=1) # Erode the dilated image
     # Step 4: Detecting lines
-    lines = cv2.HoughLinesP(edges, 1, np.pi/180, 50, None, minLineLength=0.6*(max(w, h)), maxLineGap=30)
+    lines = cv2.HoughLinesP(erode, 1, np.pi/180, 50, None, minLineLength=0.6*(max(w, h)), maxLineGap=20)
     mean_dyaw = 0.0
     dyaws = []
     # Step 5: Calculating dyaws
     if lines is not None:
+        linfo = [] # Line's info
         for line in lines:
             x1, y1, x2, y2 = line[0]
             dx = x2 - x1
@@ -75,15 +78,18 @@ def get_dyaw(box):
             dyaw = np.arctan2(dx, dy)
             if dyaw > np.pi/2: # Adjusting dyaw if necessary
                 dyaw = -(np.pi - dyaw)
-            dyaws.append(dyaw)
+            linfo.append({'coord': line[0],
+                          'dyaw': dyaw,
+                          'state': 'valid'})
+        dyaws = [line['dyaw'] for line in linfo]
         # Removing outliers with Tuckey's method 
         Q1 = np.percentile(dyaws, 25)
         Q3 = np.percentile(dyaws, 75)
         IQR  = Q3 - Q1
-        for i, dyaw in enumerate(dyaws):
-            if (dyaw > Q3 + 1.5*IQR) or (dyaw < Q1 - 1.5*IQR):
-                dyaws.pop(i)
-        mean_dyaw = round(np.median(dyaws), 2)
+        for line in linfo:
+            if (line['dyaw'] > Q3 + 1.5*IQR) or (line['dyaw'] < Q1 - 1.5*IQR):
+                line['state'] = 'outlier'
+        mean_dyaw = round(np.median([line['dyaw'] for line in linfo if line['state'] == 'valid']), 2)
         # Step 6: Handling extreme values
         # In our algorithm, the difference between -90 and 90 degrees is subtle
         # When dyaw is higher than 75 degrees (not expected in real conditions)
@@ -97,8 +103,17 @@ def get_dyaw(box):
     else:
         msg = '[DETECTOR] Unable to find lines'
         rospy.logwarn(msg)
+        linfo = []
         success = False
-    
+    # Step 7: Publish the detected object and lines
+    det_plot = obj.copy()
+    for line in linfo:
+        if line['state'] == 'valid':
+            cv2.line(det_plot,(line['coord'][0],line['coord'][1]),(line['coord'][2],line['coord'][3]),(0,255,0),1)
+        else:
+            cv2.line(det_plot,(line['coord'][0],line['coord'][1]),(line['coord'][2],line['coord'][3]),(0,0,255),1)
+    v4uav_pub.publish(bridge.cv2_to_imgmsg(det_plot, "bgr8"))
+
     return success, mean_dyaw
 
 def get_dz(box):
