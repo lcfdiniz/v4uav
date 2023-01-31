@@ -10,7 +10,7 @@ def ratio_detector_input(dz):
     start_dz = rospy.get_param('/controller/start_dz')
     end_dz = rospy.get_param('/controller/end_dz')
     
-    return (1/(1+np.exp(-((12.0/(start_dz-end_dz))*(dz-end_dz)-6.0))))
+    return (1/(1+np.exp(-((10.0/(start_dz-end_dz))*(dz-end_dz)-5.0))))
 
 def fill_msg(msg):
     if uav_sp.mode == 'MANUAL':
