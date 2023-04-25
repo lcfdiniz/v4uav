@@ -7,7 +7,7 @@ detector:
   config_path: /home/lucas/catkin_ws/src/v4uav/assets/model/v4uav.cfg # .cfg file path
   camera_focal_length: 277.19 # Camera's focal length
   ptl_width: 26.2 # Distance between the real PTL's farthest lines, in meters
-  ewa_beta: 0.8 # Beta parameter of exponentially weighted averages
+  ewa_beta: 0.6 # Beta parameter of exponentially weighted averages
   dyaw_low_thr: 0.1745 # Threshold value below which we can control other states (dx, dy, dz)
 
 # V4UAV Controller parameters

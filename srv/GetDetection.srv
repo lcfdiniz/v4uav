@@ -1,4 +1,5 @@
 string mode
+bool cold_start
 ---
 uint8 n_obj
 float64 dx

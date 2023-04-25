@@ -35,7 +35,7 @@ def shutdown_msg():
     rospy.loginfo(msg)
 
 def handle_command(data):
-    global reached
+    global reached, cold_start
     success = True # Flag to acknowledge if mode transition was successful
     if uav_st.landed == 1: # LANDED_STATE_ON_GROUND
         if data.mode == 'TAKEOFF':
@@ -84,14 +84,13 @@ def handle_command(data):
             msg = 'Holding at position (' + str(uav_sp.x_sp) + ' x, ' + str(uav_sp.y_sp) + ' y, ' + str(uav_sp.z_sp) + ' z, ' + str(uav_sp.yaw_sp) + ' yaw' + ').'
             rospy.loginfo(msg)
         elif data.mode == 'TRACKING':
-            # Nothing to do here, the setpoint will be updated with update_setpoint()
+            # Set cold_start to True
+            cold_start = True
             msg = 'TRACKING mode enabled.'
             rospy.loginfo(msg)
         elif data.mode == 'LANDING':
-            # Nothing to do here, the setpoint will be updated with update_setpoint()
-            rospy.set_param('/controller/start_dz', uav_pos.z)
-            min_dz = rospy.get_param('/detector/min_dz')
-            rospy.set_param('/controller/end_dz', uav_pos.z-(uav_det.dz-min_dz))
+            # Set cold_start to True
+            cold_start = True
             msg = 'LANDING mode enabled.'
             rospy.loginfo(msg)
         elif data.mode == 'MANUAL':
@@ -174,7 +173,7 @@ def init():
     global v4uav_pub
     v4uav_pub = rospy.Publisher("/v4uav/setpoint", v4uav_setpoint, queue_size=10)
     # Step 3: Declare global variables
-    global uav_pos, uav_st, uav_sp, uav_det, reached, ptl_dist, dyaw_upp_thr, kpx, kpy, kpz, kpyaw, count_non_det, non_det_max
+    global uav_pos, uav_st, uav_sp, uav_det, reached, ptl_dist, dyaw_upp_thr, kpx, kpy, kpz, kpyaw, count_non_det, non_det_max, cold_start
     uav_pos = uavPosition() # Global object to store the vehicle's position
     uav_st = uavState() # Global object to store the vehicle's state
     uav_sp = uavSetpoint() # Global object to store the vehicle's setpoint
@@ -188,6 +187,7 @@ def init():
     kpyaw = rospy.get_param('/controller/kpyaw') # P controller z gain in run_control function
     count_non_det = 0 # Successive non-detections counter
     non_det_max = rospy.get_param('/controller/non_det_max') # Max successive non-detections before switching to HOLD mode
+    cold_start = False # Flag the first detection when in TRACKING and LANDING modes
     # Step 4: Cold start 'start_dz' and 'end_dz' parameters (LANDING mode)
     rospy.set_param('/controller/start_dz', 0.0) # Z position where the vehicle engages LANDING mode
     rospy.set_param('/controller/end_dz', 0.0) # Z position from which PTL boundaries are still within camera's image
@@ -221,7 +221,7 @@ def get_detection_client():
     try:
         rospy.wait_for_service('get_detection', timeout=5)
         get_detection = rospy.ServiceProxy('get_detection', GetDetection)
-        det = get_detection(mode=uav_sp.mode)
+        det = get_detection(mode=uav_sp.mode, cold_start=cold_start)
         uav_det.set_detection(uav_sp.mode, det)
     except (rospy.ROSException, rospy.ServiceException) as e:
         msg = 'Service call failed: ' + str(e)
@@ -269,13 +269,16 @@ def update_setpoint():
 def run_control(mode):
     msg = 'Running the controllers'
     #rospy.loginfo(msg)
-    global count_non_det, reached
+    global count_non_det, reached, cold_start
     # Step 1: Check if the vehicle is stuck somewhere (multiple non-detections)
     # 20 successive non-detections seems enough
     if uav_det.n_obj == 0:
         count_non_det = count_non_det + 1
     else:
         count_non_det = 0
+        if cold_start:
+            rospy.set_param('/controller/start_dz', uav_det.dz)
+            cold_start = False
         # Step 2: Check if dyaw is above 'dyaw_up_thr' radians
         if abs(uav_det.dyaw) > abs(dyaw_upp_thr):
             # Sharp discontinuity ahead. Hold and wait user command
@@ -290,9 +293,16 @@ def run_control(mode):
                 uav_sp.vx_sp = uav_det.dx*kpx
                 uav_sp.vz_sp = (ptl_dist - uav_det.dz)*kpz
             elif mode == 'LANDING':
-                uav_sp.z_sp = uav_pos.z
-                uav_sp.vx_sp = 0
-                uav_sp.vz_sp = -uav_det.dz*kpz
+                crt_dz = rospy.get_param('/detector/crt_dz')
+                if uav_det.dz < crt_dz: # The vehicle reached critic dz
+                    msg = 'Critical altitude reached. Switching to full manual control.'
+                    rospy.loginfo(msg)
+                    uav_sp.mode = 'MANUAL'
+                    handle_command(uav_sp)
+                else:
+                    uav_sp.z_sp = uav_pos.z
+                    uav_sp.vx_sp = 0
+                    uav_sp.vz_sp = -uav_det.dz*kpz
     # Step 3: If the vehicle is stuck, switch to HOLD or MANUAL
     if count_non_det >= non_det_max: # Vehicle is stuck
         if mode == 'TRACKING':

@@ -8,9 +8,9 @@ from v4uav.msg import v4uav_setpoint
 
 def ratio_detector_input(dz):
     start_dz = rospy.get_param('/controller/start_dz')
-    end_dz = rospy.get_param('/controller/end_dz')
-    
-    return (1/(1+np.exp(-((10.0/(start_dz-end_dz))*(dz-end_dz)-5.0))))
+    crt_dz = rospy.get_param('/detector/crt_dz')
+
+    return (1/(1+np.exp(-((10.0/(start_dz-crt_dz))*(dz-crt_dz)-5.0))))
 
 def fill_msg(msg):
     if uav_sp.mode == 'MANUAL':
@@ -24,7 +24,7 @@ def fill_msg(msg):
         msg.velocity.z = uav_sp.vz_sp
         msg.yaw_rate = uav_sp.yaw_rate_sp
     elif uav_sp.mode == 'LANDING': # Mix uav_sp and input_sp
-        alpha = ratio_detector_input(uav_sp.z_sp)
+        alpha = ratio_detector_input(-uav_sp.vz_sp/kpz)
         msg.velocity.x = alpha*(uav_sp.vx_sp) + (1-alpha)*(input_sp.vx_sp)
         msg.velocity.y = alpha*(uav_sp.vy_sp) + (1-alpha)*(-input_sp.vy_sp)
         msg.velocity.z = alpha*(uav_sp.vz_sp) + (1-alpha)*(input_sp.vz_sp)

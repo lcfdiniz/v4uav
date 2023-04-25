@@ -154,13 +154,16 @@ def get_dx(box):
 
     return dx
 
-def handle_detection(z_ref=0.0):
-    # Step 1: Get output layers
+def handle_detection(cold_start, z_ref=0.0):
+    # Step 1: Define beta value
+    if cold_start: beta = 0 
+    else: beta = ewa_beta
+    # Step 2: Get output layers
     layer_names = net.getLayerNames()
     output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-    # Step 2: Predicting on input image
+    # Step 3: Predicting on input image
     outs = predict(output_layers)
-    # Step 3: Selecting predictions
+    # Step 4: Selecting predictions
     threshold = 0.5 # One can change this value, if necessary
     boxes = []
     confidences = []
@@ -168,13 +171,13 @@ def handle_detection(z_ref=0.0):
     for out in outs:
         for detection in out:
             boxes, confidences, class_ids = select(detection, threshold, boxes, confidences, class_ids)
-    # Step 4: Applying Non-max suppression (NMS)
+    # Step 5: Applying Non-max suppression (NMS)
     threshold_NMS = 0.3 # One can change this value, if necessary
     indexes = cv2.dnn.NMSBoxes(boxes, confidences, threshold, threshold_NMS)
-    # Step 5: Update n_obj
+    # Step 6: Update n_obj
     det.n_obj = len(indexes)
     if det.n_obj > 0: #  Check if an object was detected
-        # Step 6: Prioritize the detection on top (since we are moving forward)
+        # Step 7: Prioritize the detection on top (since we are moving forward)
         min_y = det.detImg.shape[0]
         top_det = indexes[0] # index 0
         for i in range(len(boxes)):
@@ -183,31 +186,31 @@ def handle_detection(z_ref=0.0):
                 if y0 <= min_y:
                     min_y = y0
                     top_det = i
-        # Step 7: Defining dyaw
+        # Step 8: Defining dyaw
         success, dyaw = get_dyaw(boxes[top_det])
         if success: # Certify that we were able to find lines
-            det.dyaw = dyaw*(beta) + det.dyaw*(1-beta) # Using exponentially weighted averages
+            det.dyaw = dyaw*(1-beta) + det.dyaw*(beta) # Using exponentially weighted averages
             if abs(det.dyaw) < np.rad2deg(dyaw_low_thr):
-                # Step 8: Defining dz
+                # Step 9: Defining dz
                 dz = get_dz(boxes[top_det])
-                det.dz = dz*(beta) + det.dz*(1-beta)
-                # Step 9: Defining dy
+                det.dz = dz*(1-beta) + det.dz*(beta)
+                # Step 10: Defining dy
                 dy = get_dy(boxes[top_det])
-                det.dy = dy*(beta) + det.dy*(1-beta)
-                # Step 10: Defining dx
+                det.dy = dy*(1-beta) + det.dy*(beta)
+                # Step 11: Defining dx
                 dx = get_dx(boxes[top_det])
-                det.dx = dx*(beta) + det.dx*(1-beta)
+                det.dx = dx*(1-beta) + det.dx*(beta)
             else: # dyaw is higher than dyaw_low_thr degrees, we must correct yaw first
-                det.dz = z_ref*(beta) + det.dz*(1-beta)
-                det.dy = 0.0 + det.dy*(1-beta)
-                det.dx = 0.0 + det.dx*(1-beta)
+                det.dz = z_ref*(1-beta) + det.dz*(beta)
+                det.dy = 0.0 + det.dy*(beta)
+                det.dx = 0.0 + det.dx*(beta)
         else: # we couldn't find lines
             pass # Seems better just to wait for the next detection
     else: # No objects detected
-        det.dyaw = 0.0 + det.dyaw*(1-beta)
-        det.dz= z_ref*(beta) + det.dz*(1-beta)
-        det.dy = 0.0 + det.dy*(1-beta)
-        det.dx = 0.0 + det.dx*(1-beta)
+        det.dyaw = 0.0 + det.dyaw*(beta)
+        det.dz= z_ref*(1-beta) + det.dz*(beta)
+        det.dy = 0.0 + det.dy*(beta)
+        det.dx = 0.0 + det.dx*(beta)
     msg = '[DETECTOR] ' + str(det.n_obj) + ' object(s) detected.'
     rospy.loginfo(msg)
 
@@ -215,17 +218,17 @@ def camera_callback(data):
     try:
         det.detImg = bridge.imgmsg_to_cv2(data, "bgr8")
         dz = ptl_width*focal_length/det.detImg.shape[1]
-        global min_dz
-        if dz != min_dz:
-            min_dz = dz
-            rospy.set_param('/detector/min_dz', min_dz)
+        global crt_dz
+        if dz != crt_dz:
+            crt_dz = dz
+            rospy.set_param('/detector/crt_dz', crt_dz)
     except CvBridgeError as e:
         msg = '[DETECTOR] CvBridgeError: ' + str(e)
         rospy.logwarn(msg)
 
 def init():
     # Step 1: Declare global variables
-    global v4uav_pub, bridge, det, net, beta, focal_length, ptl_width, ptl_dist, dyaw_low_thr, min_dz
+    global v4uav_pub, bridge, det, net, ewa_beta, focal_length, ptl_width, ptl_dist, dyaw_low_thr, crt_dz
     # Step 2: Publish images with bounding boxes to /v4uav/detection
     v4uav_pub = rospy.Publisher("/v4uav/detection", Image, queue_size=1) # This makes the process slow? Not publishing by now
     # Step 3: Initialize CvBridge object (converts ROS images into OpenCV images)
@@ -233,13 +236,13 @@ def init():
     # Step 4: Initialize a detection object
     det = uavDetection()
     # Step 5: Define global variables
-    beta = rospy.get_param('/detector/ewa_beta') # Beta parameter of exponentially weighted averages
+    ewa_beta = rospy.get_param('/detector/ewa_beta') # Beta parameter of exponentially weighted averages
     focal_length = rospy.get_param('/detector/camera_focal_length') # Camera's focal length
     ptl_width = rospy.get_param('/detector/ptl_width') # Distance between the real PTL's farthest lines, in meters
     dyaw_low_thr = rospy.get_param('/detector/dyaw_low_thr') # Threshold value below which we can control other states (dx, dy, dz)
     ptl_dist = rospy.get_param('/controller/ptl_dist') # Desired distance between the vehicle and the PTL, in meters (TRACKING mode only)
-    min_dz = 0.0
-    rospy.set_param('/detector/min_dz', min_dz) # Minimum dz value from which PTL boundaries are still within camera's image
+    crt_dz = 0.0
+    rospy.set_param('/detector/crt_dz', crt_dz) # Critical dz value from which PTL boundaries are still within camera's image
     # Step 6: Subscribe to Camera images
     camera_topic = rospy.get_param('/detector/camera_topic') # ROS topic where camera's images are published
     rospy.Subscriber(camera_topic, Image, camera_callback, queue_size=1, buff_size=2**24)
@@ -253,9 +256,9 @@ def init():
 def get_detection(req):
     # Step 1: Do some process according to req.mode
     if req.mode == 'TRACKING':
-        handle_detection(z_ref=ptl_dist)
+        handle_detection(req.cold_start, z_ref=ptl_dist)
     elif req.mode == 'LANDING':
-        handle_detection()
+        handle_detection(req.cold_start)
     else:
         msg = '[DETECTOR] Unrecognized mode. Allowed modes: TRACKING, LANDING'
         rospy.logwarn(msg)
