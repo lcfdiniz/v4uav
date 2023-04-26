@@ -108,12 +108,11 @@ You could also use the keyboard!
 
 ## Results
 
-The picture below show the vehicle landing in the power transmission line. With V4UAV, you will be able to safely navigate the drone through the lines and also land on it.
-This can make inspection/maintenence routines faster, safer and more effective!
+The picture below show the vehicle landing in the power transmission line. With V4UAV, you will be able to safely navigate the drone through the lines and also land on it. This can make inspection/maintenence routines faster, safer and more effective!
 
 ![alt text](https://github.com/lcfdiniz/V4UAV/blob/main/assets/images/v4uav_gazebo.png?raw=true)
 
-Furthermore, check out the [article](https://link.springer.com/article/10.1007/s10846-022-01725-x) wrote about this project!
+Moreover, check out the [article](https://link.springer.com/article/10.1007/s10846-022-01725-x) wrote about this project and the [video](https://youtu.be/OSvRhq23Uk4), showing all the basic functionality/usage of the package!
 
 ## Questions?
 
